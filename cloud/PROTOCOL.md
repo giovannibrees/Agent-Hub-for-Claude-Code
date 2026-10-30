@@ -53,7 +53,9 @@ You run inside `/loop`. Each iteration, in this order:
    Act on each, then mark `{"read": true}`.
 4. Work on your current task. Post items as needed.
 5. Pace the loop to keep cost low: about 5 minutes in planning, longer while busy with a long
-   task, about 30 minutes for the lead's audits. Blocked on everything and only waiting for
+   task, about 30 minutes for the lead's audits. Waiting on the CEO for a decision that blocks
+   others (the plan, a release, a scope change): about 5 minutes for the first 30 minutes after
+   you posted it, then about 15 minutes. Blocked on everything else and only waiting for
    answers: about 60 minutes between checks. Delivered: end the loop.
 
 ## 3. Posting items
