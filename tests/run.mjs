@@ -230,6 +230,28 @@ test('Usage limit: banner, resume once, no duplicate', async () => {
   await p.done();
 });
 
+test('Blocked start: buttons hide, Copy start request appears with the right text', async () => {
+  const p = await open({ faults: { mcp: 'blocked_by_policy', mcpDelay: 0 } });
+  await p.waitForTimeout(300);
+  const ag = p.locator('.agent', { hasText: 'builder-2-gym-app' });
+  await ag.locator('[data-start]').click();
+  await p.waitForTimeout(300);
+  check(/Copy start request/.test(await ag.locator('.error').textContent()), 'no pointer to the start request');
+  check(await p.locator('[data-start]').count() === 0, 'start buttons still shown');
+  const btn = p.locator('.project', { hasText: 'gym-app' }).first().locator('[data-copy-start]');
+  check(await btn.count() === 1, 'no Copy start request on the project card');
+  const text = await p.evaluate(() => startRequest('gym-app'));
+  check(/create_session/.test(text) && /builder-2-gym-app/.test(text) && /\/loop You are agent "builder-2-gym-app"/.test(text) && /permission_mode "auto"/.test(text), 'start request text incomplete');
+  await p.done();
+});
+
+test('Each project shows a status line', async () => {
+  const p = await open();
+  const line = await p.locator('.project', { hasText: 'gym-app' }).first().locator('.pstatus').textContent();
+  check(/agents running/.test(line) && /T-5, T-6 in progress/.test(line) && /1 in review/.test(line) && /3 of 8 done/.test(line) && /need/.test(line), `status line: ${line}`);
+  await p.done();
+});
+
 test('Phone alert level saves', async () => {
   const p = await open();
   await p.selectOption('#alerts-level', 'all');

@@ -177,14 +177,16 @@ document.getElementById('add-form').addEventListener('submit', async (e) => {
     for (const a of agents) await db.doc(`agents/${a}`).set({ agent: a, project: name, role: role(a), registered_at: now, state: 'registered' });
     const out = document.getElementById('add-result');
     const copy = (t) => `<div class="cmd"><code>${esc(t)}</code><button type="button" class="btn" data-copy="${esc(t)}">Copy</button></div>`;
-    const cloud = mcp ? `<div class="cloud-start"><p class="note">Start every agent as a Claude Code session in the cloud${githubRepo(repo) ? ` on ${esc(githubRepo(repo))}` : ''}. They run in auto mode and report here; the lead starts with the plan.</p>
+    const cloud = startBlocked ? `<div class="cloud-start"><p class="note">Your organization does not allow this page to start sessions. Copy the start request and paste it into a Claude Code session: it starts every agent, lead first.</p>
+        <button type="button" class="btn primary" data-copy-start="${esc(name)}">Copy start request</button></div>
+      <details><summary>Or start them one by one</summary>` : mcp ? `<div class="cloud-start"><p class="note">Start every agent as a Claude Code session in the cloud${githubRepo(repo) ? ` on ${esc(githubRepo(repo))}` : ''}. They run in auto mode and report here; the lead starts with the plan.</p>
         <label hidden>Cloud environment <select id="env-pick"></select></label>
         <button type="button" class="btn primary" data-start-all="${esc(name)}">Start ${agents.length} agent${agents.length === 1 ? '' : 's'} in the cloud</button>
         <p class="hint" id="start-all-msg" role="status"></p></div>
       <details><summary>Or start them yourself</summary>` : '';
     out.innerHTML = `<h3>${esc(name)} is ready</h3>${cloud}
       <p class="note">For each agent, open a new Claude Code session${repo ? ` on ${esc(repo)}` : ''} (claude.ai/code, the desktop app or a terminal), switch it to auto mode so it can write to this page, and paste its line. The lead starts by writing the plan; you approve it in Needs you.</p>
-      <ol class="steps">${agents.map((a) => `<li>${esc(a)} (${role(a)})${copy(startLine(a, role(a), name, repo))}</li>`).join('')}</ol>${mcp ? '</details>' : ''}
+      <ol class="steps">${agents.map((a) => `<li>${esc(a)} (${role(a)})${copy(startLine(a, role(a), name, repo))}</li>`).join('')}</ol>${mcp || startBlocked ? '</details>' : ''}
       <button type="button" class="link" id="add-another">Add another project</button>`;
     out.hidden = false;
     document.getElementById('add-form').hidden = true;

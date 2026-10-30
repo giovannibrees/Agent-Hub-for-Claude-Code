@@ -95,6 +95,19 @@ The page is private, so only you can open it. To give a colleague access, use th
   When the message says the session may have started anyway, check claude.ai/code before you
   click again, so you do not run the same agent twice.
 
+### When your organization blocks starting from the page
+
+Some claude.ai organizations do not allow pages to start Claude Code sessions. The first time a
+start is refused, the hub remembers it, hides the start buttons and shows **Copy start request**
+on each project card that has agents not running. Paste that request into any Claude Code session
+you start yourself: it starts every stopped agent of the project, lead first, and records their
+sessions in the hub. An organization owner can allow pages to use connectors in the
+organization's settings; then the start buttons work again (clear the page's site data to show
+them).
+
+Each project card also shows a status line: agents running, tasks in progress and in review,
+tasks done, how many cards need you and the last activity.
+
 ### Start agents yourself
 
 Under **Or start them yourself** you get one start line per agent, each with a Copy button. Use
@@ -598,6 +611,7 @@ The full rules are in [cloud/PROTOCOL.md](../cloud/PROTOCOL.md). In short:
 | An agent shows Idle | It has not checked in for 30 minutes. Click **Start again** on its card, or open its session and paste the start line again. Loops end after 7 days. |
 | Answers do not save | The page shows "Not saved" on the card and an **Allow saving** banner. Click it and allow the page's database, then answer again. |
 | No **Start in the cloud** button | The page was published without the Claude Code connector, or you turned it off in the page's Permissions menu. Paste the start lines instead. |
+| "Your organization does not allow starting sessions from a page" | Use **Copy start request** on the project card and paste it into a Claude Code session you start yourself. |
 | Your answer did not reach the agent | Agents read answers on their next loop check, usually within minutes. If the agent stopped, the lead takes the answer over within 30 minutes. |
 | An agent asked you in its own chat | Tell it: "Use the hub for questions." The protocol says the hub is the only channel. |
 | A UI card has no screenshot | The card shows a warning. Click **More info** and ask for the screenshot. |

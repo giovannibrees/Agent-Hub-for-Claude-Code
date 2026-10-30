@@ -1,6 +1,13 @@
 document.addEventListener('click', async (e) => {
   const t = e.target.closest('button');
   if (!t) return;
+  if (t.dataset.copyStart) {
+    const label = t.textContent;
+    try { await navigator.clipboard.writeText(startRequest(t.dataset.copyStart)); t.textContent = 'Copied: paste it into a Claude Code session'; }
+    catch (x) { t.textContent = 'Copy failed: open the agents\' start lines instead'; }
+    setTimeout(() => { t.textContent = label; }, 3000);
+    return;
+  }
   if (t.dataset.copy) {
     try { await navigator.clipboard.writeText(t.dataset.copy); t.textContent = 'Copied'; }
     catch (x) { const code = t.previousElementSibling; if (code) window.getSelection().selectAllChildren(code); t.textContent = 'Press Ctrl+C'; }

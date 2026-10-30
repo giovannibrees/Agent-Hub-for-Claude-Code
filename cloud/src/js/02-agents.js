@@ -52,10 +52,28 @@ async function scheduleResume(names) {
   }
 }
 
+// Some organizations do not allow pages to start sessions. Once the page sees that, it stops
+// offering start buttons and offers one start request to paste into a Claude Code session.
+let startBlocked = false;
+try { startBlocked = localStorage.getItem('hub-start-blocked') === '1'; } catch (e) { /* storage blocked */ }
+function markStartBlocked() { startBlocked = true; try { localStorage.setItem('hub-start-blocked', '1'); } catch (e) { /* ignore */ } }
+
+// One message that starts every stopped agent of a project, for a Claude Code session to run.
+function startRequest(project) {
+  const p = S.projects.find((x) => x.name === project) || {};
+  const list = S.agents.filter((a) => a.project === project && !isRunning(a))
+    .sort((x, y) => (roleOf(y.agent) === 'lead') - (roleOf(x.agent) === 'lead'));
+  const src = githubRepo(p.repo);
+  return [`Start the Agent Hub agents of project "${project}". For each agent below, in this order, create a Claude Code cloud session with the create_session tool of the Claude Code Remote connector: permission_mode "auto", title "<agent> (Agent Hub)"${src ? `, source_url "${src}"` : ''}, and the agent's start line as the prompt.`,
+    `After each start, record it in the hub with the ArtifactData tool: action "update", url ${HUB_URL}, collection "agents", doc_id the agent's name, data {"session_id": <id>, "session_url": "https://claude.ai/code/<id>", "started_at": <now>, "state": "started"}. Then reply with one line per agent and stop.`, '',
+    ...list.map((a, i) => `${i + 1}. ${a.agent}\nStart line: ${startLine(a.agent, a.role || roleOf(a.agent), project, p.repo || '')}`)].join('\n');
+}
+function stoppedCount(project) { return S.agents.filter((a) => a.project === project && !isRunning(a)).length; }
+
 function cloudHtml(a, running) {
   const parts = [];
   if (a.session_url && /^https:\/\/claude\.ai\/code\//.test(a.session_url)) parts.push(`<a href="${esc(a.session_url)}" target="_blank" rel="noopener">Open session</a>`);
-  if (mcp && !running) parts.push(starting[a.agent] ? '<span class="hint" role="status">Starting...</span>'
+  if (mcp && !running && !startBlocked) parts.push(starting[a.agent] ? '<span class="hint" role="status">Starting...</span>'
     : `<button class="link" data-start="${esc(a.agent)}">${a.session_id ? 'Start again' : 'Start in the cloud'}</button>`);
   const err = startErr[a.agent] ? `<p class="error" role="alert">${esc(startErr[a.agent])}</p>` : '';
   return limitHtml(a) + (parts.length || err ? `<div class="agent-links">${parts.join(' ')}</div>${err}` : '');
@@ -78,7 +96,7 @@ function startMessage(e) {
     case 'needs_reauth': return 'Reconnect Claude Code in claude.ai Settings, Connectors, then try again.';
     case 'not_in_manifest': return 'Starting agents is turned off for this page. Turn on Claude Code in the page\'s Permissions menu.';
     case 'approval_required': return 'claude.ai asked for your approval and did not get it. Click again and choose Allow.';
-    case 'blocked_by_policy': return 'Your organization does not allow starting sessions from a page. Paste the start line instead.';
+    case 'blocked_by_policy': markStartBlocked(); return 'Your organization does not allow starting sessions from a page. Use Copy start request on the project card instead.';
     case 'tool_error': return `Claude Code refused: ${String(e.message || 'no reason given').slice(0, 200)}`;
     case 'server_unavailable': case 'upstream_error': case 'cancelled':
       return 'No answer from Claude Code. The session may have started anyway: check claude.ai/code before you try again.';

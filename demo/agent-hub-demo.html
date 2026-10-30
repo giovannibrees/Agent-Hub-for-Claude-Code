@@ -423,6 +423,10 @@ textarea { width: 100%; resize: vertical; line-height: 1.5; }
 /* Rail: projects */
 .project { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; display: grid; gap: 8px; min-width: 0; }
 .project-top { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.pstatus { margin: 0; color: var(--muted); font-size: 14px; }
+.pstatus strong { color: var(--accent); }
+.start-row { display: grid; gap: 6px; justify-items: start; }
+.start-row .btn { white-space: nowrap; }
 .project p { margin: 0; color: var(--muted); font-size: 15px; }
 .seg { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--sunk); }
 .seg span { display: block; height: 100%; }
@@ -733,10 +737,28 @@ async function scheduleResume(names) {
   }
 }
 
+// Some organizations do not allow pages to start sessions. Once the page sees that, it stops
+// offering start buttons and offers one start request to paste into a Claude Code session.
+let startBlocked = false;
+try { startBlocked = localStorage.getItem('hub-start-blocked') === '1'; } catch (e) { /* storage blocked */ }
+function markStartBlocked() { startBlocked = true; try { localStorage.setItem('hub-start-blocked', '1'); } catch (e) { /* ignore */ } }
+
+// One message that starts every stopped agent of a project, for a Claude Code session to run.
+function startRequest(project) {
+  const p = S.projects.find((x) => x.name === project) || {};
+  const list = S.agents.filter((a) => a.project === project && !isRunning(a))
+    .sort((x, y) => (roleOf(y.agent) === 'lead') - (roleOf(x.agent) === 'lead'));
+  const src = githubRepo(p.repo);
+  return [`Start the Agent Hub agents of project "${project}". For each agent below, in this order, create a Claude Code cloud session with the create_session tool of the Claude Code Remote connector: permission_mode "auto", title "<agent> (Agent Hub)"${src ? `, source_url "${src}"` : ''}, and the agent's start line as the prompt.`,
+    `After each start, record it in the hub with the ArtifactData tool: action "update", url ${HUB_URL}, collection "agents", doc_id the agent's name, data {"session_id": <id>, "session_url": "https://claude.ai/code/<id>", "started_at": <now>, "state": "started"}. Then reply with one line per agent and stop.`, '',
+    ...list.map((a, i) => `${i + 1}. ${a.agent}\nStart line: ${startLine(a.agent, a.role || roleOf(a.agent), project, p.repo || '')}`)].join('\n');
+}
+function stoppedCount(project) { return S.agents.filter((a) => a.project === project && !isRunning(a)).length; }
+
 function cloudHtml(a, running) {
   const parts = [];
   if (a.session_url && /^https:\/\/claude\.ai\/code\//.test(a.session_url)) parts.push(`<a href="${esc(a.session_url)}" target="_blank" rel="noopener">Open session</a>`);
-  if (mcp && !running) parts.push(starting[a.agent] ? '<span class="hint" role="status">Starting...</span>'
+  if (mcp && !running && !startBlocked) parts.push(starting[a.agent] ? '<span class="hint" role="status">Starting...</span>'
     : `<button class="link" data-start="${esc(a.agent)}">${a.session_id ? 'Start again' : 'Start in the cloud'}</button>`);
   const err = startErr[a.agent] ? `<p class="error" role="alert">${esc(startErr[a.agent])}</p>` : '';
   return limitHtml(a) + (parts.length || err ? `<div class="agent-links">${parts.join(' ')}</div>${err}` : '');
@@ -759,7 +781,7 @@ function startMessage(e) {
     case 'needs_reauth': return 'Reconnect Claude Code in claude.ai Settings, Connectors, then try again.';
     case 'not_in_manifest': return 'Starting agents is turned off for this page. Turn on Claude Code in the page\'s Permissions menu.';
     case 'approval_required': return 'claude.ai asked for your approval and did not get it. Click again and choose Allow.';
-    case 'blocked_by_policy': return 'Your organization does not allow starting sessions from a page. Paste the start line instead.';
+    case 'blocked_by_policy': markStartBlocked(); return 'Your organization does not allow starting sessions from a page. Use Copy start request on the project card instead.';
     case 'tool_error': return `Claude Code refused: ${String(e.message || 'no reason given').slice(0, 200)}`;
     case 'server_unavailable': case 'upstream_error': case 'cancelled':
       return 'No answer from Claude Code. The session may have started anyway: check claude.ai/code before you try again.';
@@ -1005,6 +1027,25 @@ async function refreshCosts() {
   costsBusy = false;
 }
 
+// One line per project: what is happening right now.
+function statusLine(p, tasks) {
+  const ag = S.agents.filter((a) => a.project === p.name);
+  const running = ag.filter(isRunning).length;
+  const parts = [`${running} of ${ag.length} agent${ag.length === 1 ? '' : 's'} running`];
+  const doing = tasks.filter((t) => t.status === 'in-progress');
+  if (doing.length) parts.push(`${doing.map((t) => t.id).join(', ')} in progress`);
+  const review = tasks.filter((t) => t.status === 'review').length;
+  if (review) parts.push(`${review} in review`);
+  const done = tasks.filter((t) => t.status === 'done').length;
+  if (tasks.length) parts.push(`${done} of ${tasks.length} done`);
+  else if ((p.phase || 'planning') === 'planning') parts.push('plan being written');
+  const need = S.items.filter((i) => i.project === p.name && i.needs_me && i.status === 'open' && !isSnoozed(i)).length;
+  parts.push(need ? `<strong>${need} need${need === 1 ? 's' : ''} you</strong>` : 'nothing needs you');
+  const last = ag.map((a) => ms(a.last_seen)).sort((x, y) => y - x)[0];
+  if (last) parts.push(`last activity ${esc(ago(new Date(last).toISOString()))}`);
+  return parts.join(' · ');
+}
+
 function renderProjects() {
   document.getElementById('projects-block').hidden = !S.projects.length;
   const order = ['done', 'review', 'in-progress', 'ready-for-dev', 'backlog'];
@@ -1016,6 +1057,8 @@ function renderProjects() {
     const seg = tasks.length ? order.filter((st) => n[st]).map((st) => `<span class="${st}" style="width:${(n[st] / tasks.length) * 100}%"></span>`).join('') : '';
     return `<div class="project">
       <div class="project-top"><h3>${esc(p.name)}</h3><span class="chip${p.phase === 'building' ? ' soft' : ''}">${esc(p.phase || 'planning')}</span></div>
+      <p class="pstatus">${statusLine(p, tasks)}</p>
+      ${stoppedCount(p.name) && (startBlocked || !mcp) ? `<div class="start-row"><button type="button" class="btn" data-copy-start="${esc(p.name)}">Copy start request</button><span class="hint">${stoppedCount(p.name)} agent${stoppedCount(p.name) === 1 ? '' : 's'} not running. Paste it into a Claude Code session to start ${stoppedCount(p.name) === 1 ? 'it' : 'them'}.</span></div>` : ''}
       <label class="prio" for="prio-${esc(p.name)}">Priority <select id="prio-${esc(p.name)}" data-prio="${esc(p.name)}">${['P1', 'P2', 'P3'].map((v) => `<option${(p.priority || 'P2') === v ? ' selected' : ''}>${v}</option>`).join('')}</select></label>
       ${costHtml(p)}
       <label class="auto" for="auto-${esc(p.name)}"><input type="checkbox" id="auto-${esc(p.name)}" data-auto="${esc(p.name)}"${p.auto_release === false ? '' : ' checked'}> Release automatically when all checks pass</label>
@@ -1397,14 +1440,16 @@ document.getElementById('add-form').addEventListener('submit', async (e) => {
     for (const a of agents) await db.doc(`agents/${a}`).set({ agent: a, project: name, role: role(a), registered_at: now, state: 'registered' });
     const out = document.getElementById('add-result');
     const copy = (t) => `<div class="cmd"><code>${esc(t)}</code><button type="button" class="btn" data-copy="${esc(t)}">Copy</button></div>`;
-    const cloud = mcp ? `<div class="cloud-start"><p class="note">Start every agent as a Claude Code session in the cloud${githubRepo(repo) ? ` on ${esc(githubRepo(repo))}` : ''}. They run in auto mode and report here; the lead starts with the plan.</p>
+    const cloud = startBlocked ? `<div class="cloud-start"><p class="note">Your organization does not allow this page to start sessions. Copy the start request and paste it into a Claude Code session: it starts every agent, lead first.</p>
+        <button type="button" class="btn primary" data-copy-start="${esc(name)}">Copy start request</button></div>
+      <details><summary>Or start them one by one</summary>` : mcp ? `<div class="cloud-start"><p class="note">Start every agent as a Claude Code session in the cloud${githubRepo(repo) ? ` on ${esc(githubRepo(repo))}` : ''}. They run in auto mode and report here; the lead starts with the plan.</p>
         <label hidden>Cloud environment <select id="env-pick"></select></label>
         <button type="button" class="btn primary" data-start-all="${esc(name)}">Start ${agents.length} agent${agents.length === 1 ? '' : 's'} in the cloud</button>
         <p class="hint" id="start-all-msg" role="status"></p></div>
       <details><summary>Or start them yourself</summary>` : '';
     out.innerHTML = `<h3>${esc(name)} is ready</h3>${cloud}
       <p class="note">For each agent, open a new Claude Code session${repo ? ` on ${esc(repo)}` : ''} (claude.ai/code, the desktop app or a terminal), switch it to auto mode so it can write to this page, and paste its line. The lead starts by writing the plan; you approve it in Needs you.</p>
-      <ol class="steps">${agents.map((a) => `<li>${esc(a)} (${role(a)})${copy(startLine(a, role(a), name, repo))}</li>`).join('')}</ol>${mcp ? '</details>' : ''}
+      <ol class="steps">${agents.map((a) => `<li>${esc(a)} (${role(a)})${copy(startLine(a, role(a), name, repo))}</li>`).join('')}</ol>${mcp || startBlocked ? '</details>' : ''}
       <button type="button" class="link" id="add-another">Add another project</button>`;
     out.hidden = false;
     document.getElementById('add-form').hidden = true;
@@ -1419,6 +1464,13 @@ document.getElementById('add-form').addEventListener('submit', async (e) => {
 document.addEventListener('click', async (e) => {
   const t = e.target.closest('button');
   if (!t) return;
+  if (t.dataset.copyStart) {
+    const label = t.textContent;
+    try { await navigator.clipboard.writeText(startRequest(t.dataset.copyStart)); t.textContent = 'Copied: paste it into a Claude Code session'; }
+    catch (x) { t.textContent = 'Copy failed: open the agents\' start lines instead'; }
+    setTimeout(() => { t.textContent = label; }, 3000);
+    return;
+  }
   if (t.dataset.copy) {
     try { await navigator.clipboard.writeText(t.dataset.copy); t.textContent = 'Copied'; }
     catch (x) { const code = t.previousElementSibling; if (code) window.getSelection().selectAllChildren(code); t.textContent = 'Press Ctrl+C'; }

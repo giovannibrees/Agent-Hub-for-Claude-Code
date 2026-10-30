@@ -139,6 +139,25 @@ async function refreshCosts() {
   costsBusy = false;
 }
 
+// One line per project: what is happening right now.
+function statusLine(p, tasks) {
+  const ag = S.agents.filter((a) => a.project === p.name);
+  const running = ag.filter(isRunning).length;
+  const parts = [`${running} of ${ag.length} agent${ag.length === 1 ? '' : 's'} running`];
+  const doing = tasks.filter((t) => t.status === 'in-progress');
+  if (doing.length) parts.push(`${doing.map((t) => t.id).join(', ')} in progress`);
+  const review = tasks.filter((t) => t.status === 'review').length;
+  if (review) parts.push(`${review} in review`);
+  const done = tasks.filter((t) => t.status === 'done').length;
+  if (tasks.length) parts.push(`${done} of ${tasks.length} done`);
+  else if ((p.phase || 'planning') === 'planning') parts.push('plan being written');
+  const need = S.items.filter((i) => i.project === p.name && i.needs_me && i.status === 'open' && !isSnoozed(i)).length;
+  parts.push(need ? `<strong>${need} need${need === 1 ? 's' : ''} you</strong>` : 'nothing needs you');
+  const last = ag.map((a) => ms(a.last_seen)).sort((x, y) => y - x)[0];
+  if (last) parts.push(`last activity ${esc(ago(new Date(last).toISOString()))}`);
+  return parts.join(' · ');
+}
+
 function renderProjects() {
   document.getElementById('projects-block').hidden = !S.projects.length;
   const order = ['done', 'review', 'in-progress', 'ready-for-dev', 'backlog'];
@@ -150,6 +169,8 @@ function renderProjects() {
     const seg = tasks.length ? order.filter((st) => n[st]).map((st) => `<span class="${st}" style="width:${(n[st] / tasks.length) * 100}%"></span>`).join('') : '';
     return `<div class="project">
       <div class="project-top"><h3>${esc(p.name)}</h3><span class="chip${p.phase === 'building' ? ' soft' : ''}">${esc(p.phase || 'planning')}</span></div>
+      <p class="pstatus">${statusLine(p, tasks)}</p>
+      ${stoppedCount(p.name) && (startBlocked || !mcp) ? `<div class="start-row"><button type="button" class="btn" data-copy-start="${esc(p.name)}">Copy start request</button><span class="hint">${stoppedCount(p.name)} agent${stoppedCount(p.name) === 1 ? '' : 's'} not running. Paste it into a Claude Code session to start ${stoppedCount(p.name) === 1 ? 'it' : 'them'}.</span></div>` : ''}
       <label class="prio" for="prio-${esc(p.name)}">Priority <select id="prio-${esc(p.name)}" data-prio="${esc(p.name)}">${['P1', 'P2', 'P3'].map((v) => `<option${(p.priority || 'P2') === v ? ' selected' : ''}>${v}</option>`).join('')}</select></label>
       ${costHtml(p)}
       <label class="auto" for="auto-${esc(p.name)}"><input type="checkbox" id="auto-${esc(p.name)}" data-auto="${esc(p.name)}"${p.auto_release === false ? '' : ' checked'}> Release automatically when all checks pass</label>
