@@ -144,6 +144,8 @@ function statusLine(p, tasks) {
   const ag = S.agents.filter((a) => a.project === p.name);
   const running = ag.filter(isRunning).length;
   const parts = [`${running} of ${ag.length} agent${ag.length === 1 ? '' : 's'} running`];
+  const asleep = ag.filter(isAsleep).length;
+  if (asleep) parts.push(`<strong>${asleep} asleep</strong>`);
   const doing = tasks.filter((t) => t.status === 'in-progress');
   if (doing.length) parts.push(`${doing.map((t) => t.id).join(', ')} in progress`);
   const review = tasks.filter((t) => t.status === 'review').length;

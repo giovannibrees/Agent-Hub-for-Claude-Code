@@ -252,6 +252,20 @@ test('Each project shows a status line', async () => {
   await p.done();
 });
 
+test('An agent that missed its check shows as asleep', async () => {
+  const p = await open();
+  await p.evaluate(async () => {
+    const db = await window.HUB_DEMO.use('db');
+    await db.doc('agents/builder-gym-app').update({ next_check_at: new Date(Date.now() - 20 * 60000).toISOString() });
+    await db.doc('agents/reviewer-gym-app').update({ next_check_at: new Date(Date.now() + 8 * 60000).toISOString() });
+  });
+  await p.waitForTimeout(300);
+  check(/Asleep: missed its check/.test(await p.locator('.agent', { hasText: 'builder-gym-app' }).first().textContent()), 'no asleep warning');
+  check(/Next check/.test(await p.locator('.agent', { hasText: 'reviewer-gym-app' }).textContent()), 'no next check time');
+  check(/1 asleep/.test(await p.locator('.project', { hasText: 'gym-app' }).first().locator('.pstatus').textContent()), 'status line misses the asleep agent');
+  await p.done();
+});
+
 test('Phone alert level saves', async () => {
   const p = await open();
   await p.selectOption('#alerts-level', 'all');

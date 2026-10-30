@@ -57,6 +57,24 @@ You run inside `/loop`. Each iteration, in this order:
    others (the plan, a release, a scope change): about 5 minutes for the first 30 minutes after
    you posted it, then about 15 minutes. Blocked on everything else and only waiting for
    answers: about 60 minutes between checks. Delivered: end the loop.
+6. Schedule your next check so it survives: an idle session can be shut down, and a wait inside
+   `/loop` is then lost. At the end of every iteration, call the `send_later` tool of the
+   Claude Code Remote connector (ToolSearch `select:mcp__claude-code-remote__send_later`) with
+   `delay_minutes` set to your pace and the message "Agent Hub check: run your next loop
+   iteration." Write the time into your agents doc as `next_check_at` (in the same heartbeat
+   update or a second one). The hub shows an agent whose `next_check_at` passed more than 10
+   minutes ago as asleep.
+
+### Wake the agent you hand work to
+
+Whenever you give another agent work (a directive, a task moved to `review` for its checkers,
+a failed check back to the builder, a handover), wake that agent at once instead of waiting for
+its next check: read its agents doc and, if it has a `session_id`, call the `create_trigger`
+tool of the Claude Code Remote connector (ToolSearch
+`select:mcp__claude-code-remote__create_trigger`) with `persistent_session_id` set to that
+`session_id`, `run_once_at` one minute from now, `initiation: "own_followup"`, name
+"Wake <agent>", and the prompt "Agent Hub: you have new work. Run your next loop iteration now."
+An agent without a `session_id` picks the work up on its own next check.
 
 ## 3. Posting items
 

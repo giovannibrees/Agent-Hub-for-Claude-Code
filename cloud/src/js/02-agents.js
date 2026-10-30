@@ -70,13 +70,23 @@ function startRequest(project) {
 }
 function stoppedCount(project) { return S.agents.filter((a) => a.project === project && !isRunning(a)).length; }
 
+// Agents write next_check_at when they schedule their next check. One that missed it by more
+// than 10 minutes has most likely been shut down while idle.
+const ASLEEP_MS = 10 * 60000;
+function isAsleep(a) { return !!(a.next_check_at && a.state !== 'delivered' && Date.now() - ms(a.next_check_at) > ASLEEP_MS); }
+function nextCheckHtml(a) {
+  if (!a.next_check_at || a.state === 'delivered') return '';
+  if (isAsleep(a)) return `<p class="asleep">Asleep: missed its check at ${esc(hhmm(a.next_check_at))}. Open its session and send any message to wake it.</p>`;
+  return ms(a.next_check_at) > Date.now() ? `<p class="hint">Next check ${esc(hhmm(a.next_check_at))}</p>` : '';
+}
+
 function cloudHtml(a, running) {
   const parts = [];
   if (a.session_url && /^https:\/\/claude\.ai\/code\//.test(a.session_url)) parts.push(`<a href="${esc(a.session_url)}" target="_blank" rel="noopener">Open session</a>`);
   if (mcp && !running && !startBlocked) parts.push(starting[a.agent] ? '<span class="hint" role="status">Starting...</span>'
     : `<button class="link" data-start="${esc(a.agent)}">${a.session_id ? 'Start again' : 'Start in the cloud'}</button>`);
   const err = startErr[a.agent] ? `<p class="error" role="alert">${esc(startErr[a.agent])}</p>` : '';
-  return limitHtml(a) + (parts.length || err ? `<div class="agent-links">${parts.join(' ')}</div>${err}` : '');
+  return limitHtml(a) + nextCheckHtml(a) + (parts.length || err ? `<div class="agent-links">${parts.join(' ')}</div>${err}` : '');
 }
 
 function savedEnv() { try { return localStorage.getItem('hub-env') || ''; } catch (e) { return ''; } }

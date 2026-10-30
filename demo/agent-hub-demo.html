@@ -392,6 +392,7 @@ textarea { width: 100%; resize: vertical; line-height: 1.5; }
 .brief-grid .full { grid-column: 1 / -1; }
 @media (max-width: 600px) { .brief-grid { grid-template-columns: minmax(0, 1fr); } }
 .limit { color: var(--warn); font-weight: 600; }
+.asleep { color: var(--error); font-weight: 600; }
 .undo { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; background: var(--sunk); border-radius: var(--radius); padding: 8px 12px; }
 .snooze { min-width: 0; width: auto; }
 .attach-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; font-size: 14px; }
@@ -755,13 +756,23 @@ function startRequest(project) {
 }
 function stoppedCount(project) { return S.agents.filter((a) => a.project === project && !isRunning(a)).length; }
 
+// Agents write next_check_at when they schedule their next check. One that missed it by more
+// than 10 minutes has most likely been shut down while idle.
+const ASLEEP_MS = 10 * 60000;
+function isAsleep(a) { return !!(a.next_check_at && a.state !== 'delivered' && Date.now() - ms(a.next_check_at) > ASLEEP_MS); }
+function nextCheckHtml(a) {
+  if (!a.next_check_at || a.state === 'delivered') return '';
+  if (isAsleep(a)) return `<p class="asleep">Asleep: missed its check at ${esc(hhmm(a.next_check_at))}. Open its session and send any message to wake it.</p>`;
+  return ms(a.next_check_at) > Date.now() ? `<p class="hint">Next check ${esc(hhmm(a.next_check_at))}</p>` : '';
+}
+
 function cloudHtml(a, running) {
   const parts = [];
   if (a.session_url && /^https:\/\/claude\.ai\/code\//.test(a.session_url)) parts.push(`<a href="${esc(a.session_url)}" target="_blank" rel="noopener">Open session</a>`);
   if (mcp && !running && !startBlocked) parts.push(starting[a.agent] ? '<span class="hint" role="status">Starting...</span>'
     : `<button class="link" data-start="${esc(a.agent)}">${a.session_id ? 'Start again' : 'Start in the cloud'}</button>`);
   const err = startErr[a.agent] ? `<p class="error" role="alert">${esc(startErr[a.agent])}</p>` : '';
-  return limitHtml(a) + (parts.length || err ? `<div class="agent-links">${parts.join(' ')}</div>${err}` : '');
+  return limitHtml(a) + nextCheckHtml(a) + (parts.length || err ? `<div class="agent-links">${parts.join(' ')}</div>${err}` : '');
 }
 
 function savedEnv() { try { return localStorage.getItem('hub-env') || ''; } catch (e) { return ''; } }
@@ -1032,6 +1043,8 @@ function statusLine(p, tasks) {
   const ag = S.agents.filter((a) => a.project === p.name);
   const running = ag.filter(isRunning).length;
   const parts = [`${running} of ${ag.length} agent${ag.length === 1 ? '' : 's'} running`];
+  const asleep = ag.filter(isAsleep).length;
+  if (asleep) parts.push(`<strong>${asleep} asleep</strong>`);
   const doing = tasks.filter((t) => t.status === 'in-progress');
   if (doing.length) parts.push(`${doing.map((t) => t.id).join(', ')} in progress`);
   const review = tasks.filter((t) => t.status === 'review').length;
