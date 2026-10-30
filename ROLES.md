@@ -102,9 +102,11 @@ Recommended model: mid-tier (Claude only runs Codex and checks its findings). Re
   saying why and stop. Never write a review yourself and call it Codex's.
 - Wakes when a task enters `review` and requires the `codex` check. Check out the builder's
   branch and run, from the repository root:
-  `codex exec review --base <base branch> -o /tmp/codex-review.md "Review this change against these acceptance criteria: <criteria>. Report only real bugs, security problems and unmet criteria, each with file, line and why."`
-  `codex exec` runs read-only by default. Never add `--dangerously-bypass-approvals-and-sandbox`
-  or any option that lets Codex write.
+  `codex exec review --base <base branch> -o /tmp/codex-review.md`
+  (Codex does not accept custom instructions together with `--base` or `--commit`; its built-in
+  review looks for bugs and security problems.) Then check the task's acceptance criteria
+  against the change yourself. `codex exec` runs read-only by default. Never add
+  `--dangerously-bypass-approvals-and-sandbox` or any option that lets Codex write.
 - Check every Codex finding against the real code before you pass it on. Codex is a second
   opinion, not an authority: drop findings you cannot confirm, and mention a dropped finding only
   when it would be critical if true ("Codex flagged X, not confirmed").

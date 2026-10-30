@@ -709,6 +709,7 @@ async function scheduleResume(names) {
   for (const n of names) {
     const a = S.agents.find((x) => x.agent === n);
     if (!a || !isLimited(a) || !a.session_id || starting[n]) continue;
+    if (a.resume_at && ms(a.resume_at) > Date.now()) continue; // already scheduled
     starting[n] = true; delete startErr[n]; render();
     try {
       const at = new Date(ms(a.limit.resets_at) + 2 * 60000).toISOString().replace(/\.\d+Z$/, 'Z');
@@ -1117,7 +1118,7 @@ function cardHtml(it, opts) {
     if (saveErr[it.id]) parts.push(`<p class="error" role="alert">${esc(saveErr[it.id])}</p>`);
     if (Object.prototype.hasOwnProperty.call(drafts, it.id) && !pend) {
       const files = fbFiles[it.id] || [];
-      parts.push(`<div class="row"><input type="text" id="fb-${esc(it.id)}" data-fb-input="${esc(it.id)}" value="${esc(drafts[it.id])}" placeholder="${arr(it.bullets).length > 1 ? '1 yes, 2 no, 3 use option B' : 'Your answer'}" maxlength="1000"><button class="btn primary" data-fb-send="${esc(it.id)}">Send</button></div>
+      parts.push(`<div class="row"><input type="text" id="fb-${esc(it.id)}" data-fb-input="${esc(it.id)}" value="${esc(drafts[it.id])}" placeholder="${arr(it.bullets).length > 1 ? '1 yes, 2 no, 3 use option B' : 'Your answer'}" maxlength="1000"><button class="btn primary" data-fb-send="${esc(it.id)}"${uploading[it.id] ? ' disabled' : ''}>Send</button></div>
         ${assetsCap ? `<div class="attach-row"><label class="btn attach">Attach files<input type="file" data-fb-file="${esc(it.id)}" multiple hidden accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,text/plain,text/markdown"></label>
           ${files.map((f, n) => `<span class="file">${esc(f.name)} <button class="link" data-fb-unfile="${esc(it.id)}" data-n="${n}" aria-label="Remove ${esc(f.name)}">remove</button></span>`).join('')}
           ${uploading[it.id] ? '<span class="hint">Uploading...</span>' : ''}${uploadErr[it.id] ? `<span class="error">${esc(uploadErr[it.id])}</span>` : ''}</div>` : ''}
@@ -1222,7 +1223,7 @@ function parsePerNumber(text) {
 const UNDO_MS = 5000;
 const pendingAct = {};
 function queueAct(id, action, text) {
-  if (pendingAct[id] || saving[id]) return;
+  if (pendingAct[id] || saving[id] || uploading[id]) return;
   const timer = setTimeout(() => { delete pendingAct[id]; act(id, action, text); }, UNDO_MS);
   pendingAct[id] = { action, text, timer };
   render();
@@ -1260,7 +1261,9 @@ async function attachFiles(id, list) {
       (fbFiles[id] = fbFiles[id] || []).push({ id: r.id, url: r.url, name: clean(f.name).slice(0, 120), kind: /^image\//.test(f.type) ? 'image' : 'file' });
     } catch (e) { uploadErr[id] = `Could not upload ${f.name} (${(e && e.code) || 'error'}).`; }
   }
-  delete uploading[id]; render();
+  delete uploading[id];
+  if (uploadErr[id] === 'Wait for the upload to finish, then send.') delete uploadErr[id];
+  render();
 }
 
 // Save state per card lives outside the DOM, so a live refresh never hides an error or re-enables
@@ -1426,6 +1429,7 @@ document.addEventListener('click', async (e) => {
   if (t.dataset.fbSend) {
     const id = t.dataset.fbSend;
     const text = (drafts[id] || '').trim();
+    if (uploading[id]) { uploadErr[id] = 'Wait for the upload to finish, then send.'; render(); return; }
     if (text || (fbFiles[id] || []).length) queueAct(id, 'feedback', text); else { const i = document.getElementById(`fb-${id}`); if (i) i.focus(); }
     return;
   }
