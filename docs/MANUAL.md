@@ -23,6 +23,19 @@ every part of it.
 
 ---
 
+## What's new
+
+- **Claude + Codex team:** OpenAI's Codex reviews every task as a second opinion. See
+  [Claude leads, Codex reviews](#claude-leads-codex-reviews).
+- **Usage limits:** stopped agents show when their limit resets and resume at reset with one
+  click. See [Usage limits](#usage-limits).
+- **Undo, Snooze, attached files and hidden-character warnings** on cards. See
+  [What a card looks like](#what-a-card-looks-like).
+- **Search all cards** and **older deliveries and flags folded away**. See [Search](#search) and
+  [Deliveries, flags and ideas](#deliveries-flags-and-ideas).
+
+---
+
 ## 1. What you need
 
 - A claude.ai account with Claude Code (claude.ai/code). The hub is a private page on claude.ai,
@@ -155,6 +168,12 @@ recommendation. Questions come batched, numbered, each with its own recommendati
   costs nothing.
 - **Attach files.** Under Feedback, **Attach files** adds screenshots, sketches, PDFs or notes
   (up to 20 MB each) to your answer. The agent downloads them with your answer.
+![Undo after Approve](img/card-undo.png)
+
+![Feedback with an attached file](img/card-attach.png)
+
+![Snoozed cards](img/snoozed.png)
+
 - **Snooze.** Pick 1 hour, 3 hours, tomorrow 9:00 or Monday 9:00 to hide a card until then. It
   comes back by itself; **Snoozed** under the cards lists what is waiting, with **Wake now**.
   Snoozing does not stop a reversible card's 4-hour clock.
@@ -426,6 +445,8 @@ Codex cannot run, the codex agent tells the lead and never reviews in Codex's na
 
 ### Usage limits
 
+![Usage limit banner](img/limit-banner.png)
+
 When an agent stops on its Claude usage limit, its card in the Agents list says so and when the
 limit resets, and a banner above **Needs you** lists every stopped agent. **Resume at reset**
 (one agent) or **Resume all at reset** schedules a message to each stopped agent two minutes
@@ -481,6 +502,8 @@ in GitHub: **PR #14 · CI passed · Preview**. The builder records it when the t
 and the lead refreshes the CI result at every check. A task with failing CI cannot be marked done.
 
 ### Search
+
+![Search all cards](img/search.png)
 
 **Search all cards** above the Feed finds cards by any words in their title, bullets,
 recommendation, answer, agent or project, across open cards and the latest 300.

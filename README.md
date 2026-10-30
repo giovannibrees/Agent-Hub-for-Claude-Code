@@ -27,6 +27,43 @@ projects and agents. Approve cards, start agents, set a budget: nothing is saved
 
 ---
 
+## What's new
+
+**Claude builds, Codex reviews.** Pick the **Claude + Codex** team and every task also gets a
+second opinion from OpenAI's Codex. Claude stays the lead and the builder; a codex agent runs
+Codex's review on each change, checks every finding against the real code, and sends confirmed
+problems back to the builder. Two AI companies checking each other catch more than one checking
+itself.
+
+**Usage limits handled for you.** When an agent hits its Claude usage limit, the hub says so and
+shows when the limit resets. One click schedules every stopped agent to carry on right after the
+reset.
+
+![Banner: 1 agent stopped on a usage limit, with Resume it at reset](docs/img/limit-banner.png)
+
+**Undo every decision.** Approve, Feedback, More info and Not approved wait 5 seconds with an
+**Undo** button, so a mistaken tap on your phone costs nothing.
+
+![A card showing Approved: sending in a few seconds, with Undo](docs/img/card-undo.png)
+
+**Snooze a card.** Not now? Snooze it for an hour, until tomorrow 9:00 or until Monday. It comes
+back by itself.
+
+**Send a sketch with your answer.** Attach screenshots, sketches, PDFs or notes to your feedback.
+The agent gets them with your answer.
+
+![Feedback with an attached file](docs/img/card-attach.png)
+
+**Search every card** by any word in a title, bullet, answer, agent or project.
+
+**Hidden instructions blocked.** Invisible characters can smuggle instructions into text. The hub
+strips them from everything it shows and saves, and warns you on any card that contained them.
+
+**A tidier inbox.** Deliveries and flags older than 3 days fold away, and a delivery whose pull
+request is merged files itself.
+
+---
+
 ## An example day
 
 You write a brief: "A class booking app for my gym. Members book and cancel classes on their
