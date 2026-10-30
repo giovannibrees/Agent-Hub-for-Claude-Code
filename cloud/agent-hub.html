@@ -1019,7 +1019,7 @@ function parsePerNumber(text) {
 
 // ---------- undo, snooze, files in answers ----------
 // A decision waits 5 seconds before it is saved, so a mistaken tap can be undone.
-const UNDO_MS = 5000;
+const UNDO_MS = window.HUB_UNDO_MS || 5000; // tests shorten it
 const pendingAct = {};
 function queueAct(id, action, text) {
   if (pendingAct[id] || saving[id] || uploading[id]) return;

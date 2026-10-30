@@ -8,6 +8,15 @@
   const clone = (v) => JSON.parse(JSON.stringify(v));
   const snapDoc = (id, data) => ({ id, exists: data !== undefined, data: () => (data === undefined ? undefined : clone(data)), metadata: { fromCache: false, hasPendingWrites: false } });
   const err = (code, message) => Object.assign(new Error(message), { code });
+  // Tests (tests/run.mjs) set window.HUB_FAULTS to simulate failures and read window.HUB_CALLS.
+  const faults = () => window.HUB_FAULTS || {};
+  const writeFault = () => {
+    const f = faults();
+    if (f.writeOnce) { const c = f.writeOnce; delete f.writeOnce; throw err(c, 'simulated'); }
+    if (f.write) throw err(f.write, 'simulated');
+    return !!f.drop;
+  };
+  window.HUB_CALLS = window.HUB_CALLS || [];
 
   function split(path) {
     const parts = path.split('/');
@@ -56,8 +65,9 @@
     return {
       id, path,
       get: async () => snapDoc(id, col(c).get(id)),
-      set: async (data) => { col(c).set(id, clone(data)); notify(); },
+      set: async (data) => { if (writeFault()) return; col(c).set(id, clone(data)); notify(); },
       update: async (data) => {
+        if (writeFault()) return;
         const cur = col(c).get(id);
         if (!cur) throw err('invalid_argument', 'document does not exist');
         col(c).set(id, Object.assign(cur, clone(data))); notify();
@@ -88,7 +98,9 @@
   const mcp = {
     listTools: async () => ({ servers: [{ server: 'Claude Code Remote', tools: [{ name: 'list_environments' }, { name: 'create_session' }, { name: 'get_session' }, { name: 'create_trigger' }] }] }),
     callTool: async (server, tool, input) => {
-      await new Promise((r) => setTimeout(r, 500));
+      window.HUB_CALLS.push([tool, clone(input || {})]);
+      await new Promise((r) => setTimeout(r, faults().mcpDelay ?? 500));
+      if (faults().mcp) throw err(faults().mcp, 'simulated');
       if (tool === 'list_environments') return { payload: { environments: [{ environment_id: 'env_demo', name: 'Default', state: 'active' }] } };
       if (tool === 'create_trigger') return { payload: { trigger: { id: `trig_demo${++n}` } } };
       if (tool === 'create_session') return { payload: { ccr: { id: `session_demo${++n}` } } };
@@ -102,9 +114,9 @@
     },
   };
   const assets = {
-    upload: async (blob) => { await new Promise((r) => setTimeout(r, 300)); return { id: `asset${++n}`, url: URL.createObjectURL(blob), sizeBytes: blob.size, contentType: blob.type }; },
+    upload: async (blob) => { await new Promise((r) => setTimeout(r, faults().uploadDelay ?? 300)); return { id: `asset${++n}`, url: URL.createObjectURL(blob), sizeBytes: blob.size, contentType: blob.type }; },
   };
-  const permissions = { state: async () => 'granted', request: async () => ({}), manage: async () => {} };
+  const permissions = { state: async () => faults().perm || 'granted', request: async () => ({}), manage: async () => { delete faults().perm; delete faults().write; } };
 
   window.HUB_DEMO = {
     use: async (name) => (name === 'db' ? db : name === 'mcp' ? mcp : name === 'assets' ? assets : name === 'permissions' ? permissions : null),
