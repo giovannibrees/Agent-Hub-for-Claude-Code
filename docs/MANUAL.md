@@ -42,7 +42,7 @@ can create artifacts:
 
 ```text
 Set up the Agent Hub from https://github.com/giovannibrees/Claude-Dashboard for me:
-1. Publish cloud/agent-hub.html as an artifact with the db and assets capabilities, and the mcp capability for the "Claude Code Remote" connector with the tools list_environments, create_session and get_session.
+1. Publish cloud/agent-hub.html as an artifact with the db and assets capabilities, and the mcp capability for the "Claude Code Remote" connector with the tools list_environments, create_session, get_session and create_trigger.
 2. Replace HUB_URL_PLACEHOLDER in the page with the artifact's own URL and publish it again to the same URL.
 3. Store the text of cloud/PROTOCOL.md in the artifact's database: collection "config", doc "protocol", field "text".
 4. Store the text of ROLES.md the same way: collection "config", doc "roles", field "text".
@@ -150,6 +150,18 @@ recommendation. Questions come batched, numbered, each with its own recommendati
 
 ![Feedback per number](img/card-feedback.png)
 
+- **Undo.** After you click a decision, the card shows "sending in a few seconds" with an
+  **Undo** button for 5 seconds. Nothing is saved until then, so a mistaken tap on your phone
+  costs nothing.
+- **Attach files.** Under Feedback, **Attach files** adds screenshots, sketches, PDFs or notes
+  (up to 20 MB each) to your answer. The agent downloads them with your answer.
+- **Snooze.** Pick 1 hour, 3 hours, tomorrow 9:00 or Monday 9:00 to hide a card until then. It
+  comes back by itself; **Snoozed** under the cards lists what is waiting, with **Wake now**.
+  Snoozing does not stop a reversible card's 4-hour clock.
+- **Hidden characters.** Invisible characters can hide instructions in text, for example in a
+  brief or a pasted issue. The page removes them from everything it shows and saves, and a card
+  that contained them says so. Read such a card carefully before you approve.
+
 ### Phone alerts
 
 When a card needs you, the agent that posted it sends you a push notification and an email
@@ -193,12 +205,13 @@ restart. Answered cards in the feed say "Not picked up yet" until an agent reads
 |---|---|---|
 | Solo | lead, builder | Small fixes, landing pages, internal scripts. The lead reviews. |
 | Standard | lead, builder, reviewer, security | Most apps |
+| Claude + Codex | lead, builder, reviewer, codex, security | Most apps, with a second opinion from OpenAI's Codex on every task |
 | Product | lead, designer, builder, builder-2, reviewer, qa | Apps with many screens |
 | Secure | lead, architect, builder, builder-2, reviewer, security, qa | Payments, personal data, real users, production |
 | Review | lead, builder, reviewer, security, cleanup, usertest | An existing app: code audit plus user tests |
 
 You can also type your own list. The name sets the role: names starting with `lead`, `architect`,
-`design`, `review`, `security`, `qa`, `usertest`, `cleanup` or `docs` get that role, everything
+`design`, `review`, `security`, `qa`, `usertest`, `cleanup`, `docs` or `codex` get that role, everything
 else is a builder. Start small and add a role when you miss it: bugs slipping through (add a
 reviewer), anything with logins or money (add security), many screens (add a designer and QA).
 Seven agents per project is the useful maximum.
@@ -217,6 +230,7 @@ Seven agents per project is the useful maximum.
 | Usertest | Uses the app as your customer profiles | Fixes code, invents goals |
 | Cleanup | Finds dead code, duplicates and unused packages, with proof | Restyles working code for taste |
 | Docs | Keeps the README and setup true by running every command | Changes application code |
+| Codex | Runs OpenAI's Codex on every task's change, checks each finding against the code, passes or fails the task | Edits code, gives Codex write access |
 
 The full cards are in [ROLES.md](../ROLES.md).
 
@@ -398,6 +412,25 @@ from the hub's own data, so it costs nothing.
 
 ![Last 24 hours](img/digest.png)
 
+### Claude leads, Codex reviews
+
+Pick the **Claude + Codex** team, or add an agent called `codex` to any team. Claude stays the
+lead and the builder. Every task then also needs the `codex` check: the codex agent runs OpenAI's
+Codex review on the builder's change, checks each finding against the real code, and passes the
+task or sends it back with the confirmed findings. The builder fixes them and the task goes
+through the checks again, Codex included.
+
+Codex needs OpenAI access in the environment where the agents run: an `OPENAI_API_KEY` secret in
+the cloud environment's settings. Codex usage is billed by OpenAI, separately from Claude. If
+Codex cannot run, the codex agent tells the lead and never reviews in Codex's name.
+
+### Usage limits
+
+When an agent stops on its Claude usage limit, its card in the Agents list says so and when the
+limit resets, and a banner above **Needs you** lists every stopped agent. **Resume at reset**
+(one agent) or **Resume all at reset** schedules a message to each stopped agent two minutes
+after its reset, so it carries on by itself. This works for agents the hub started.
+
 ### Cost and budget
 
 Each project card shows what its agents have cost so far, read from the Claude Code sessions the
@@ -447,7 +480,15 @@ Tasks and cards show their pull request, its CI result and a preview link when t
 in GitHub: **PR #14 · CI passed · Preview**. The builder records it when the task goes to review,
 and the lead refreshes the CI result at every check. A task with failing CI cannot be marked done.
 
+### Search
+
+**Search all cards** above the Feed finds cards by any words in their title, bullets,
+recommendation, answer, agent or project, across open cards and the latest 300.
+
 ### Deliveries, flags and ideas
+
+Deliveries and lead flags older than 3 days fold into **Older than 3 days**. A delivery whose pull
+request is merged is filed by the lead automatically.
 
 - **Deliveries**: finished work with links and proof it was tested. **Acknowledge** files it away.
 

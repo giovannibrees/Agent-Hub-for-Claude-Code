@@ -10,13 +10,14 @@ task gets checked before it counts as done. The role cards the agents follow are
 |---|---|---|
 | Solo | lead, builder | Small fixes, landing pages, internal scripts. The lead reviews. |
 | Standard | lead, builder, reviewer, security | Most apps. |
+| Claude + Codex | lead, builder, reviewer, codex, security | Most apps, with a second opinion from OpenAI's Codex on every task. |
 | Product | lead, designer, builder, builder-2, reviewer, qa | Apps with many screens. |
 | Secure | lead, architect, builder, builder-2, reviewer, security, qa | Payments, personal data, anything going to real users or production. |
 | Review | lead, builder, reviewer, security, cleanup, usertest | An existing app you want checked and cleaned up: code audit plus user tests. |
 
 The **Add project** form has these presets. You can also type your own list; the agent name sets
 the role: names starting with `lead`, `architect`, `design`, `review`, `security`, `qa`, `usertest`,
-`cleanup` or `docs`
+`cleanup`, `docs` or `codex`
 get that role, everything else is a builder (`builder`, `builder-2`, `api`, `frontend`).
 
 Rules of thumb:
@@ -51,11 +52,12 @@ The lead sets the checks each task needs when planning:
 | code | reviewer (or the lead in a Solo team) | always |
 | security | security | login, accounts, permissions, user input, uploads, payments, personal data, secrets, database queries, external APIs, new dependencies |
 | qa | qa (or the designer for pure visual work) | anything a user sees or clicks |
+| codex | codex | every task, when the team has a codex agent |
 
 The order is fixed:
 
 1. **Builder** runs tests, build and lint, records the results, and moves the task to review.
-2. **Reviewer and security** check the real code at the same time. Both are read-only.
+2. **Reviewer, security and Codex** check the real code at the same time. All are read-only.
 3. **QA** tests it from the user's side once the code checks pass.
 4. **Lead** marks it done only when every required check passed.
 

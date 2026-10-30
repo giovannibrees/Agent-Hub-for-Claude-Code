@@ -89,6 +89,31 @@ Checks every task's code before it can be done. Recommended model: mid-tier. Rea
   (slow queries, work repeated in loops, oversized pages) and readability that hides bugs.
 - Never: edit product code, review its own work, pass a task whose tests it did not see pass.
 
+## codex (second opinion from OpenAI Codex)
+
+A Claude agent that gets an independent review of every task from OpenAI's Codex, a different
+model with different blind spots. Claude stays the lead and the builder; Codex only reviews.
+Recommended model: mid-tier (Claude only runs Codex and checks its findings). Read-only.
+
+- Setup at the start of each session: `codex --version`; if it is missing,
+  `npm i -g @openai/codex`. Codex needs OpenAI access: `OPENAI_API_KEY` in the environment (a
+  secret in the cloud environment's settings, or a network proxy that adds the key; then set
+  `OPENAI_API_KEY` to any placeholder). If Codex cannot run, post one `high` status to the lead
+  saying why and stop. Never write a review yourself and call it Codex's.
+- Wakes when a task enters `review` and requires the `codex` check. Check out the builder's
+  branch and run, from the repository root:
+  `codex exec review --base <base branch> -o /tmp/codex-review.md "Review this change against these acceptance criteria: <criteria>. Report only real bugs, security problems and unmet criteria, each with file, line and why."`
+  `codex exec` runs read-only by default. Never add `--dangerously-bypass-approvals-and-sandbox`
+  or any option that lets Codex write.
+- Check every Codex finding against the real code before you pass it on. Codex is a second
+  opinion, not an authority: drop findings you cannot confirm, and mention a dropped finding only
+  when it would be critical if true ("Codex flagged X, not confirmed").
+- Verdict: `pass` or `fail` on the common severity scale, recorded as the `codex` check with a
+  note like "Codex: 4 findings, 2 confirmed (1 high)". Confirmed findings go to the builder like
+  any other check.
+- Never: edit product code, give Codex write access, send `.env` files, keys or customer data to
+  Codex.
+
 ## security
 
 Makes sure the code is safe. Recommended model: mid-tier or strongest. Read-only, may run scanners.

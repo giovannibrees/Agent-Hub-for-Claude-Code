@@ -70,5 +70,11 @@ DATA.tasks.forEach((t) => {
   if (t.id === 'client-portal--T-1') t.pr = { url: 'https://github.com/acme/client-portal/pull/3', number: 3, ci: 'fail', checked_at: iso(20) };
 });
 DATA.items.forEach((i) => { if (i.type === 'delivery' && !i.pr) { i.pr = { url: 'https://github.com/acme/gym-app/pull/12', number: 12, ci: 'pass', checked_at: iso(30) }; i.preview_url = 'https://pr-12.gym-app.example.com'; } });
+// One card snoozed until tomorrow morning, one delivery older than 3 days.
+const tomorrow9 = new Date(); tomorrow9.setDate(tomorrow9.getDate() + 1); tomorrow9.setHours(9, 0, 0, 0);
+DATA.items.push({ id: 'i20', timestamp: iso(200), agent: 'lead-landing-v2', project: 'landing-v2', type: 'question', title: 'Pricing page: show yearly prices first?', priority: 'normal', status: 'open', needs_me: true, reversible: true,
+  bullets: ['Yearly saves 20%', 'Most visitors compare monthly'], recommendation: 'Show monthly first, yearly as a toggle', snoozed_until: tomorrow9.toISOString() });
+DATA.items.push({ id: 'i21', timestamp: iso(60 * 24 * 5), agent: 'builder-client-portal', project: 'client-portal', type: 'delivery', title: 'Login and password reset', priority: 'normal', status: 'open', needs_me: false,
+  bullets: ['Email and password login', 'Reset link valid 1 hour', 'Locked after 5 failed tries'], links: ['https://pr-2.client-portal.example.com'], verification: ['npm test: 64 passed'] });
 DATA.config = [{ id: 'alerts', level: 'important' }];
 window.HUB_DEMO.load(DATA);

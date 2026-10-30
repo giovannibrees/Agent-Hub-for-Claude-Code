@@ -86,22 +86,28 @@
   // A pretend Claude Code connector, so "Start in the cloud" and costs can be tried in the demo.
   let n = 0;
   const mcp = {
-    listTools: async () => ({ servers: [{ server: 'Claude Code Remote', tools: [{ name: 'list_environments' }, { name: 'create_session' }, { name: 'get_session' }] }] }),
+    listTools: async () => ({ servers: [{ server: 'Claude Code Remote', tools: [{ name: 'list_environments' }, { name: 'create_session' }, { name: 'get_session' }, { name: 'create_trigger' }] }] }),
     callTool: async (server, tool, input) => {
       await new Promise((r) => setTimeout(r, 500));
       if (tool === 'list_environments') return { payload: { environments: [{ environment_id: 'env_demo', name: 'Default', state: 'active' }] } };
+      if (tool === 'create_trigger') return { payload: { trigger: { id: `trig_demo${++n}` } } };
       if (tool === 'create_session') return { payload: { ccr: { id: `session_demo${++n}` } } };
       if (tool === 'get_session') {
         const costs = { session_demo_lead: 18.4, session_demo_b1: 22.75, session_demo_b2: 9.1, session_demo_rev: 4.2 };
-        return { payload: { ccr: { id: input.session_id, external_metadata: { usage: { cost_usd: costs[input.session_id] || 0.4 } } } } };
+        const limited = input.session_id === 'session_demo_b2';
+        const rate = { status: limited ? 'rejected' : 'allowed', rateLimitType: 'five_hour', resetsAt: Math.floor(Date.now() / 1000) + (limited ? 95 : 180) * 60 };
+        return { payload: { ccr: { id: input.session_id, external_metadata: { usage: { cost_usd: costs[input.session_id] || 0.4 }, rate_limit_info: rate } } } };
       }
       throw err('tool_error', 'not available in the demo');
     },
   };
+  const assets = {
+    upload: async (blob) => { await new Promise((r) => setTimeout(r, 300)); return { id: `asset${++n}`, url: URL.createObjectURL(blob), sizeBytes: blob.size, contentType: blob.type }; },
+  };
   const permissions = { state: async () => 'granted', request: async () => ({}), manage: async () => {} };
 
   window.HUB_DEMO = {
-    use: async (name) => (name === 'db' ? db : name === 'mcp' ? mcp : name === 'permissions' ? permissions : null),
+    use: async (name) => (name === 'db' ? db : name === 'mcp' ? mcp : name === 'assets' ? assets : name === 'permissions' ? permissions : null),
     load(data) {
       for (const [c, rows] of Object.entries(data)) for (const r of rows) col(c).set(r.id, clone(r));
     },

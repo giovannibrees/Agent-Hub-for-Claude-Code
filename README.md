@@ -89,6 +89,9 @@ not a description of it.
 **Your phone buzzes when it matters.** Agents send a push alert and an email for high-priority cards and
 anything that cannot be undone, or for every card if you prefer. Set it next to **Needs you**.
 
+**A mistaken tap costs nothing.** Every decision waits 5 seconds with an **Undo** button. Snooze a
+card until tomorrow morning, attach a screenshot or sketch to your answer, and search every card.
+
 **You are never the bottleneck.** A reversible decision shows a 4-hour clock. If you have not
 answered by then, the agent goes with its own recommendation and tells you. Anything you cannot
 undo (deleting data, payments, publishing, production) waits for you, no exceptions.
@@ -104,6 +107,7 @@ project, or type your own list.
 |---|---|---|
 | **Solo** | lead, builder | Small fixes, landing pages, scripts |
 | **Standard** | lead, builder, reviewer, security | Most apps |
+| **Claude + Codex** | lead, builder, reviewer, codex, security | Most apps, with a second opinion from OpenAI's Codex on every task |
 | **Product** | lead, designer, 2 builders, reviewer, qa | Apps with many screens |
 | **Secure** | lead, architect, 2 builders, reviewer, security, qa | Payments, personal data, production |
 | **Review** | lead, builder, reviewer, security, cleanup, usertest | An existing app you want checked and cleaned up |
@@ -120,6 +124,7 @@ project, or type your own list.
 | **Usertest** | Uses the app as each of your customer profiles and reports bugs, blockers and confusing spots |
 | **Cleanup** | Finds dead code, duplicates and unused packages, and proves every finding before suggesting a delete |
 | **Docs** | Keeps the README and setup steps true by running every command it documents |
+| **Codex** | Has OpenAI's Codex review every change, checks each finding against the code, and sends confirmed problems back to the builder |
 
 ![The agents rail: each agent with its project, role, current task and last check-in](docs/img/agents.png)
 
@@ -209,6 +214,10 @@ Nothing changes until you approve, except critical security holes, which are fix
   data, and anything with payments always ask you first.
 - **Lessons carried forward.** After each project the lead saves up to 5 one-line lessons and
   reads them when it plans the next one.
+- **Two AI companies checking each other.** Claude leads and builds; OpenAI's Codex reviews every
+  task as a second opinion. Different models catch different mistakes.
+- **Usage limits handled.** When an agent hits its Claude usage limit, the hub shows when it
+  resets and resumes it then with one click.
 - **An ideas backlog.** Good ideas from agents and test users are parked, not built. You decide later.
 - **Finished work with proof.** Deliveries come with links, test results and screenshots, and
   every task shows its pull request, CI result and preview link.
@@ -263,7 +272,7 @@ audits in `docs/audits/`, user tests with screenshots in `docs/user-tests/`.
 
 ```text
 Set up the Agent Hub from https://github.com/giovannibrees/Claude-Dashboard for me:
-1. Publish cloud/agent-hub.html as an artifact with the db and assets capabilities, and the mcp capability for the "Claude Code Remote" connector with the tools list_environments, create_session and get_session.
+1. Publish cloud/agent-hub.html as an artifact with the db and assets capabilities, and the mcp capability for the "Claude Code Remote" connector with the tools list_environments, create_session, get_session and create_trigger.
 2. Replace HUB_URL_PLACEHOLDER in the page with the artifact's own URL and publish it again to the same URL.
 3. Store the text of cloud/PROTOCOL.md in the artifact's database: collection "config", doc "protocol", field "text".
 4. Store the text of ROLES.md the same way: collection "config", doc "roles", field "text".

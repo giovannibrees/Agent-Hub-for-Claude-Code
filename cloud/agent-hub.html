@@ -152,7 +152,11 @@ textarea { width: 100%; resize: vertical; line-height: 1.5; }
 .hint { color: var(--muted); font-size: 15px; }
 .error { color: var(--error); }
 .needs-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
-.alerts { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 15px; }
+.alerts { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; color: var(--muted); font-size: 15px; min-width: 0; }
+.block > * { min-width: 0; }
+.card { grid-template-columns: minmax(0, 1fr); }
+.card > * { min-width: 0; }
+.card .row input { min-width: 0; }
 .alerts select { min-width: 0; }
 .cost { display: grid; gap: 6px; margin-block: 4px; }
 .cost p { margin: 0; }
@@ -174,6 +178,14 @@ textarea { width: 100%; resize: vertical; line-height: 1.5; }
 .brief-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius); }
 .brief-grid .full { grid-column: 1 / -1; }
 @media (max-width: 600px) { .brief-grid { grid-template-columns: minmax(0, 1fr); } }
+.limit { color: var(--warn); font-weight: 600; }
+.undo { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; background: var(--sunk); border-radius: var(--radius); padding: 8px 12px; }
+.snooze { min-width: 0; width: auto; }
+.attach-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; font-size: 14px; }
+.attach-row .file { color: var(--muted); }
+.shelf summary { cursor: pointer; color: var(--muted); font-weight: 600; margin-block: 6px; }
+.search { display: grid; gap: 5px; color: var(--muted); font-size: 15px; }
+.search input { width: 100%; }
 .agent-links { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; }
 .agent-links a { color: var(--accent); }
 .cloud-start { display: grid; gap: 10px; justify-items: start; margin-block: 8px 16px; }
@@ -287,6 +299,7 @@ textarea { width: 100%; resize: vertical; line-height: 1.5; }
       <label for="f-team">Team <select id="f-team">
         <option value="lead, builder">Solo: lead, builder</option>
         <option value="lead, builder, reviewer, security" selected>Standard: lead, builder, reviewer, security</option>
+        <option value="lead, builder, reviewer, codex, security">Claude + Codex: lead, builder, reviewer, codex, security</option>
         <option value="lead, designer, builder, builder-2, reviewer, qa">Product: lead, designer, 2 builders, reviewer, qa</option>
         <option value="lead, architect, builder, builder-2, reviewer, security, qa">Secure: lead, architect, 2 builders, reviewer, security, qa</option>
         <option value="lead, builder, reviewer, security, cleanup, usertest">Review: lead, builder, reviewer, security, cleanup, usertest</option>
@@ -323,18 +336,25 @@ textarea { width: 100%; resize: vertical; line-height: 1.5; }
           <label class="alerts" id="alerts-wrap" hidden>Phone alerts <select id="alerts-level">
             <option value="important">Important cards</option><option value="all">Every card</option><option value="off">Off</option></select></label></div>
         <p class="error" id="alerts-err" hidden></p>
+        <p class="banner" id="limit-banner" hidden></p>
         <div id="needs" class="cards"><p class="empty">Nothing needs you right now.</p></div>
+        <details class="shelf" id="snoozed-wrap" hidden><summary>Snoozed <span class="count" id="snoozed-count"></span></summary>
+          <p class="note">Snoozed cards come back by themselves at their time. A reversible card's 4-hour clock keeps running while it is snoozed.</p>
+          <div id="snoozed" class="cards"></div></details>
       </section>
       <section class="block" id="deliveries-block" hidden>
         <h2>Deliveries <span class="count" id="deliveries-count"></span></h2>
         <div id="deliveries" class="cards"></div>
+        <details class="shelf" id="deliveries-old-wrap" hidden><summary>Older than 3 days <span class="count" id="deliveries-old-count"></span></summary><div id="deliveries-old" class="cards"></div></details>
       </section>
       <section class="block" id="flags-block" hidden>
         <h2>Lead agent flags <span class="count" id="flags-count"></span></h2>
         <div id="flags" class="cards"></div>
+        <details class="shelf" id="flags-old-wrap" hidden><summary>Older than 3 days <span class="count" id="flags-old-count"></span></summary><div id="flags-old" class="cards"></div></details>
       </section>
       <section class="block">
         <h2>Feed</h2>
+        <label class="search" for="search">Search all cards <input type="search" id="search" data-search="1" placeholder="Words from a title, bullet, answer, agent or project" autocomplete="off"></label>
         <form class="filters" id="filters" aria-label="Filters">
           <label for="flt-agent">Agent</label><select id="flt-agent"></select>
           <label for="flt-project">Project</label><select id="flt-project"></select>
@@ -383,6 +403,7 @@ const MEANING = {
 };
 
 let db = null;
+let searchQ = '';
 // The demo page (demo/) defines window.HUB_DEMO with an in-memory database and sample data.
 function useCap(name) {
   if (window.HUB_DEMO) return window.HUB_DEMO.use(name);
@@ -396,7 +417,13 @@ const msgDrafts = {};
 let filters = { agent: '', project: '', type: '' };
 try { filters = Object.assign(filters, JSON.parse(localStorage.getItem('hub-filters') || '{}')); } catch (e) { /* storage blocked */ }
 
-function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+// Invisible characters (zero-width, bidirectional controls, Unicode tags) can hide instructions in
+// text. The page never shows or saves them, and warns on a card that contained them.
+const HIDDEN_CHARS = /[\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\uFEFF\u{E0000}-\u{E007F}]/gu;
+const HAS_HIDDEN = /[\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\uFEFF\u{E0000}-\u{E007F}]/u;
+function clean(s) { return String(s == null ? '' : s).replace(HIDDEN_CHARS, ''); }
+function hasHidden(it) { try { return HAS_HIDDEN.test(JSON.stringify(it)); } catch (e) { return false; } }
+function esc(s) { return clean(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 function slug(s) { return String(s || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60); }
 function ms(iso) { const t = Date.parse(iso || ''); return isNaN(t) ? 0 : t; }
 function ago(iso) {
@@ -450,13 +477,55 @@ let envs = null;
 const starting = {};
 const startErr = {};
 
+// ---------- usage limits ----------
+let triggerOn = false;
+const hhmm = (iso) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+function isLimited(a) {
+  const l = a && a.limit;
+  return !!(l && !['allowed', 'allowed_warning'].includes(l.status) && l.resets_at && ms(l.resets_at) > Date.now());
+}
+function limitedAgents() { return S.agents.filter((a) => isLimited(a) && a.session_id); }
+function limitHtml(a) {
+  if (isLimited(a)) {
+    const sched = a.resume_at && ms(a.resume_at) > Date.now();
+    return `<p class="limit">Stopped on its usage limit. Resets ${esc(hhmm(a.limit.resets_at))}.${sched ? ` Resumes ${esc(hhmm(a.resume_at))}.` : ''}</p>${
+      !sched && triggerOn ? `<div class="agent-links"><button class="link" data-resume="${esc(a.agent)}">Resume at reset</button></div>` : ''}`;
+  }
+  return a.limit && a.limit.status === 'allowed_warning' ? '<p class="hint">Close to its usage limit</p>' : '';
+}
+function renderLimitBanner() {
+  const el = document.getElementById('limit-banner');
+  const list = limitedAgents();
+  if (!list.length) { el.hidden = true; return; }
+  const open = list.filter((a) => !(a.resume_at && ms(a.resume_at) > Date.now()));
+  const next = list.map((a) => ms(a.limit.resets_at)).sort((x, y) => x - y)[0];
+  el.innerHTML = `${list.length} agent${list.length === 1 ? '' : 's'} stopped on a usage limit. The next reset is at ${esc(hhmm(new Date(next).toISOString()))}. `
+    + (open.length && triggerOn ? `<button type="button" class="btn" id="resume-all">Resume ${open.length === 1 ? 'it' : `all ${open.length}`} at reset</button>` : open.length ? 'Start them again after the reset.' : 'All are scheduled to resume.');
+  el.hidden = false;
+}
+const RESUME_PROMPT = (a) => `Your usage limit has reset. Continue where you stopped: you are agent "${a.agent}" in the Agent Hub at ${HUB_URL}. Read your directives and your current task there, then carry on following the hub rules.`;
+async function scheduleResume(names) {
+  for (const n of names) {
+    const a = S.agents.find((x) => x.agent === n);
+    if (!a || !isLimited(a) || !a.session_id || starting[n]) continue;
+    starting[n] = true; delete startErr[n]; render();
+    try {
+      const at = new Date(ms(a.limit.resets_at) + 2 * 60000).toISOString().replace(/\.\d+Z$/, 'Z');
+      const r = await mcp.callTool(CC, 'create_trigger', { name: `Resume ${n} (Agent Hub)`, prompt: RESUME_PROMPT(a), persistent_session_id: a.session_id, run_once_at: at, initiation: 'human_request' });
+      const trig = (r.payload && (r.payload.trigger || r.payload)) || {};
+      await db.doc(`agents/${n}`).update({ resume_at: at, resume_trigger: trig.id || null });
+    } catch (e) { startErr[n] = startMessage(e); }
+    delete starting[n]; render();
+  }
+}
+
 function cloudHtml(a, running) {
   const parts = [];
   if (a.session_url && /^https:\/\/claude\.ai\/code\//.test(a.session_url)) parts.push(`<a href="${esc(a.session_url)}" target="_blank" rel="noopener">Open session</a>`);
   if (mcp && !running) parts.push(starting[a.agent] ? '<span class="hint" role="status">Starting...</span>'
     : `<button class="link" data-start="${esc(a.agent)}">${a.session_id ? 'Start again' : 'Start in the cloud'}</button>`);
   const err = startErr[a.agent] ? `<p class="error" role="alert">${esc(startErr[a.agent])}</p>` : '';
-  return parts.length || err ? `<div class="agent-links">${parts.join(' ')}</div>${err}` : '';
+  return limitHtml(a) + (parts.length || err ? `<div class="agent-links">${parts.join(' ')}</div>${err}` : '');
 }
 
 function savedEnv() { try { return localStorage.getItem('hub-env') || ''; } catch (e) { return ''; } }
@@ -704,10 +773,15 @@ async function refreshCosts() {
       const r = await mcp.callTool(CC, 'get_session', { session_id: a.session_id }, { cache: false });
       const pl = r.payload || {};
       const sess = pl.ccr || pl;
-      const usd = Number(sess && sess.external_metadata && sess.external_metadata.usage && sess.external_metadata.usage.cost_usd);
-      if (!Number.isFinite(usd)) continue;
-      const rounded = Math.round(usd * 100) / 100;
-      if (rounded !== Number(a.cost_usd)) await db.doc(`agents/${a.agent}`).update({ cost_usd: rounded, cost_at: new Date().toISOString() });
+      const meta = (sess && sess.external_metadata) || {};
+      const upd = {};
+      const usd = Number(meta.usage && meta.usage.cost_usd);
+      if (Number.isFinite(usd) && Math.round(usd * 100) / 100 !== Number(a.cost_usd)) { upd.cost_usd = Math.round(usd * 100) / 100; upd.cost_at = new Date().toISOString(); }
+      // Subscription limit as the session reports it: status, window and when it resets.
+      const rl = meta.rate_limit_info;
+      const lim = rl && rl.status ? { status: String(rl.status), type: String(rl.rateLimitType || ''), resets_at: Number(rl.resetsAt) ? new Date(Number(rl.resetsAt) * 1000).toISOString() : null } : null;
+      if (JSON.stringify(lim) !== JSON.stringify(a.limit || null)) upd.limit = lim;
+      if (Object.keys(upd).length) await db.doc(`agents/${a.agent}`).update(upd);
     } catch (e) { /* keep the last known cost */ }
   }
   for (const p of S.projects) {
@@ -822,26 +896,37 @@ function cardHtml(it, opts) {
   if (batched && open) parts.push('<div class="rec"><strong>Approve</strong> accepts every numbered recommendation above.</div>');
   const v = violations(it);
   if (v.length) parts.push(`<p class="violation">Protocol: ${esc(v.join(', '))}</p>`);
+  if (hasHidden(it)) parts.push('<p class="violation">Hidden characters were removed from this card. They can hide instructions from you: read it carefully before you approve.</p>');
   if (open) {
     if (it.reversible === true && !it.change) {
       const left = until(it.auto_proceed_at || new Date(ms(it.timestamp) + 4 * 3600e3).toISOString());
       parts.push(`<p class="timer">${left ? `Agent proceeds with its recommendation in ${left} if you do not answer.` : 'Past 4 hours: the agent may proceed with its recommendation.'}</p>`);
     } else parts.push('<p class="timer">Not reversible: the agent waits for you.</p>');
     const off = saving[it.id] ? ' disabled' : '';
-    parts.push(`<div class="actions">
+    const pend = pendingAct[it.id];
+    if (pend) parts.push(`<div class="undo" role="status"><span>${esc(DECISION_LABEL[pend.action] || pend.action)}: sending in a few seconds.</span><button class="btn" data-undo="${esc(it.id)}">Undo</button></div>`);
+    else parts.push(`<div class="actions">
       <button class="btn primary" data-act="approve" data-id="${esc(it.id)}"${off}>Approve</button>
       <button class="btn" data-fb-open="${esc(it.id)}"${off}>Feedback</button>
       <button class="btn" data-act="more_info" data-id="${esc(it.id)}"${off}>More info</button>
-      <button class="btn" data-act="reject" data-id="${esc(it.id)}"${off}>Not approved</button></div>`);
+      <button class="btn" data-act="reject" data-id="${esc(it.id)}"${off}>Not approved</button>
+      ${isSnoozed(it) ? `<button class="btn" data-wake="${esc(it.id)}">Wake now</button>` : `<select class="snooze" data-snooze="${esc(it.id)}" aria-label="Snooze this card"${off}><option value="">Snooze</option><option value="1h">1 hour</option><option value="3h">3 hours</option><option value="tomorrow">Tomorrow 9:00</option><option value="monday">Monday 9:00</option></select>`}</div>`);
+    if (isSnoozed(it)) parts.push(`<p class="hint">Snoozed until ${esc(new Date(it.snoozed_until).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' }))}.</p>`);
     if (saving[it.id]) parts.push('<p class="hint" role="status">Saving your answer...</p>');
     if (saveErr[it.id]) parts.push(`<p class="error" role="alert">${esc(saveErr[it.id])}</p>`);
-    if (Object.prototype.hasOwnProperty.call(drafts, it.id)) {
+    if (Object.prototype.hasOwnProperty.call(drafts, it.id) && !pend) {
+      const files = fbFiles[it.id] || [];
       parts.push(`<div class="row"><input type="text" id="fb-${esc(it.id)}" data-fb-input="${esc(it.id)}" value="${esc(drafts[it.id])}" placeholder="${arr(it.bullets).length > 1 ? '1 yes, 2 no, 3 use option B' : 'Your answer'}" maxlength="1000"><button class="btn primary" data-fb-send="${esc(it.id)}">Send</button></div>
+        ${assetsCap ? `<div class="attach-row"><label class="btn attach">Attach files<input type="file" data-fb-file="${esc(it.id)}" multiple hidden accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,text/plain,text/markdown"></label>
+          ${files.map((f, n) => `<span class="file">${esc(f.name)} <button class="link" data-fb-unfile="${esc(it.id)}" data-n="${n}" aria-label="Remove ${esc(f.name)}">remove</button></span>`).join('')}
+          ${uploading[it.id] ? '<span class="hint">Uploading...</span>' : ''}${uploadErr[it.id] ? `<span class="error">${esc(uploadErr[it.id])}</span>` : ''}</div>` : ''}
         ${arr(it.bullets).length > 1 ? '<p class="hint">Answer per number, for example: 1 yes, 2 no, 3 use option B</p>' : ''}`);
     }
   } else if (it.answer) {
     const un = unreadFor(it.id);
-    parts.push(`<p class="answer"><strong>${esc(DECISION_LABEL[it.answer.decision] || it.answer.decision)}</strong> ${ago(it.answer.at)}${it.answer.text ? `: ${esc(it.answer.text)}` : ''}${un ? `<br><span class="hint">Not picked up yet${Date.now() - ms(it.answer.at) > 30 * 60000 ? '. The lead takes it over on its next check' : ''}.</span>` : ''}</p>`);
+    const ans = S.unread.concat(S.answersAll || []).find((x) => x.item_id === it.id) || {};
+    const af = arr(it.answer.attachments || ans.attachments);
+    parts.push(`<p class="answer"><strong>${esc(DECISION_LABEL[it.answer.decision] || it.answer.decision)}</strong> ${ago(it.answer.at)}${it.answer.text ? `: ${esc(it.answer.text)}` : ''}${af.length ? ` (${af.length} file${af.length === 1 ? '' : 's'} attached)` : ''}${un ? `<br><span class="hint">Not picked up yet${Date.now() - ms(it.answer.at) > 30 * 60000 ? '. The lead takes it over on its next check' : ''}.</span>` : ''}</p>`);
   }
   if (opts.ack) parts.push(`<div class="actions"><button class="btn primary" data-act="acknowledge" data-id="${esc(it.id)}">Acknowledge</button></div>`);
   if (opts.idea) parts.push(`<div class="actions">${it.status === 'kept' ? '<span class="count">Kept for after the build</span>' : `<button class="btn" data-act="keep_idea" data-id="${esc(it.id)}">Keep for later</button>`}<button class="btn" data-act="acknowledge" data-id="${esc(it.id)}">Drop</button></div>`);
@@ -855,13 +940,15 @@ function section(id, list, empty, opts) {
 
 function render() {
   const a = document.activeElement;
-  const focusId = a && a.id && (a.dataset.fbInput || a.dataset.msgInput || a.dataset.pf || a.dataset.budget) && a.tagName === 'INPUT' ? a.id : null;
+  const focusId = a && a.id && (a.dataset.fbInput || a.dataset.msgInput || a.dataset.pf || a.dataset.budget || a.dataset.search) && a.tagName === 'INPUT' ? a.id : null;
   const caret = focusId ? a.selectionStart : null;
 
   renderFilters(); renderAgents(); renderProjects(); renderDigest();
   const items = S.items.filter(passes);
   const allItems = S.items; // Needs you, deliveries, flags and ideas are never hidden by filters
-  const needs = allItems.filter((i) => i.needs_me && i.status === 'open').sort((x, y) =>
+  const openNeeds = allItems.filter((i) => i.needs_me && i.status === 'open');
+  const snoozedList = openNeeds.filter(isSnoozed).sort((x, y) => ms(x.snoozed_until) - ms(y.snoozed_until));
+  const needs = openNeeds.filter((i) => !isSnoozed(i)).sort((x, y) =>
     (PRIO_RANK[projectPrio(x.project)] - PRIO_RANK[projectPrio(y.project)])
     || ((x.priority === 'high' ? 0 : 1) - (y.priority === 'high' ? 0 : 1))
     || (ms(x.timestamp) - ms(y.timestamp)));
@@ -869,9 +956,15 @@ function render() {
   const flags = allItems.filter((i) => i.type === 'audit' && i.priority === 'high' && i.status === 'info');
   const ideas = allItems.filter((i) => i.type === 'idea' && ['parked', 'kept'].includes(i.status));
   const used = new Set([...needs, ...deliveries, ...flags, ...ideas].map((i) => i.id));
-  const feed = items.filter((i) => !used.has(i.id) && i.type !== 'idea');
+  const snoozedIds = new Set(snoozedList.map((i) => i.id));
+  const words = clean(searchQ).toLowerCase().split(/\s+/).filter(Boolean);
+  const hay = (i) => [i.title, i.agent, i.project, i.recommendation, ...arr(i.bullets), ...arr(i.recommendations), i.answer && i.answer.text].map((x) => clean(x).toLowerCase()).join(' ');
+  const feed = words.length
+    ? allItems.filter((i) => words.every((w) => hay(i).includes(w))).sort((x, y) => ms(y.timestamp) - ms(x.timestamp))
+    : items.filter((i) => !used.has(i.id) && !snoozedIds.has(i.id) && i.type !== 'idea');
+  const old = (i) => Date.now() - ms(i.timestamp) > 3 * 86400e3;
 
-  const all = S.items.filter((i) => i.needs_me && i.status === 'open').length;
+  const all = needs.length;
   const badge = document.getElementById('needs-count');
   badge.textContent = all;
   document.getElementById('tile-needs').classList.toggle('hot', all > 0);
@@ -881,14 +974,23 @@ function render() {
   document.getElementById('t-ideas').textContent = S.items.filter((i) => i.type === 'idea' && ['parked', 'kept'].includes(i.status)).length;
   document.title = all ? `(${all}) Agent Hub` : 'Agent Hub';
 
-  section('needs', needs, 'Nothing needs you right now.');
-  document.getElementById('deliveries-block').hidden = !deliveries.length;
+  section('needs', needs, snoozedList.length ? 'Nothing needs you right now, apart from snoozed cards.' : 'Nothing needs you right now.');
+  document.getElementById('snoozed-wrap').hidden = !snoozedList.length;
+  document.getElementById('snoozed-count').textContent = snoozedList.length || '';
+  section('snoozed', snoozedList, '');
+  for (const [key, list] of [['deliveries', deliveries], ['flags', flags]]) {
+    const recent = list.filter((i) => !old(i));
+    const older = list.filter(old);
+    document.getElementById(`${key}-block`).hidden = !list.length;
+    section(key, recent, older.length ? 'Nothing from the last 3 days.' : '', { ack: true });
+    document.getElementById(`${key}-old-wrap`).hidden = !older.length;
+    document.getElementById(`${key}-old-count`).textContent = older.length || '';
+    section(`${key}-old`, older, '', { ack: true });
+  }
   document.getElementById('deliveries-count').textContent = deliveries.length ? `${deliveries.length} to review` : '';
-  section('deliveries', deliveries, '', { ack: true });
-  document.getElementById('flags-block').hidden = !flags.length;
   document.getElementById('flags-count').textContent = flags.length || '';
-  section('flags', flags, '', { ack: true });
-  section('feed', feed.slice(0, 150), S.items.length ? 'No items match these filters.' : 'Agents’ updates appear here, newest first.');
+  section('feed', feed.slice(0, 150), words.length ? `No cards match "${esc(searchQ.trim())}". Search covers the cards loaded on this page: everything open and the latest 300.` : S.items.length ? 'No items match these filters.' : 'Agents’ updates appear here, newest first.');
+  renderLimitBanner();
   document.getElementById('ideas-count').textContent = ideas.length;
   const building = S.projects.filter((p) => p.phase !== 'complete').map((p) => p.name);
   document.getElementById('ideas-note').textContent = building.length || !S.projects.length
@@ -912,6 +1014,52 @@ function parsePerNumber(text) {
   const out = {};
   marks.forEach((mk, i) => { out[mk.n] = text.slice(mk.after, i + 1 < marks.length ? marks[i + 1].start : text.length).replace(/[,;\s]+$/, '').trim(); });
   return out;
+}
+
+// ---------- undo, snooze, files in answers ----------
+// A decision waits 5 seconds before it is saved, so a mistaken tap can be undone.
+const UNDO_MS = 5000;
+const pendingAct = {};
+function queueAct(id, action, text) {
+  if (pendingAct[id] || saving[id]) return;
+  const timer = setTimeout(() => { delete pendingAct[id]; act(id, action, text); }, UNDO_MS);
+  pendingAct[id] = { action, text, timer };
+  render();
+}
+function undoAct(id) { const p = pendingAct[id]; if (!p) return; clearTimeout(p.timer); delete pendingAct[id]; render(); }
+// Leaving the page sends what is still waiting rather than dropping it.
+addEventListener('pagehide', () => { for (const [id, p] of Object.entries(pendingAct)) { clearTimeout(p.timer); delete pendingAct[id]; act(id, p.action, p.text); } });
+
+function isSnoozed(it) { return !!(it.snoozed_until && ms(it.snoozed_until) > Date.now()); }
+function snoozeTime(choice) {
+  const d = new Date();
+  if (choice === '1h') return new Date(Date.now() + 3600e3);
+  if (choice === '3h') return new Date(Date.now() + 3 * 3600e3);
+  if (choice === 'tomorrow') { d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0); return d; }
+  if (choice === 'monday') { d.setDate(d.getDate() + (((8 - d.getDay()) % 7) || 7)); d.setHours(9, 0, 0, 0); return d; }
+  return null;
+}
+async function snooze(id, until) {
+  try { await db.doc(`items/${id}`).update({ snoozed_until: until ? until.toISOString() : null }); delete saveErr[id]; }
+  catch (e) { saveErr[id] = saveMessage(e); }
+  render();
+}
+
+let assetsCap = null;
+const fbFiles = {};
+const uploading = {};
+const uploadErr = {};
+async function attachFiles(id, list) {
+  if (!assetsCap || !list.length) return;
+  uploading[id] = true; delete uploadErr[id]; render();
+  for (const f of list) {
+    if (f.size > 20 * 1024 * 1024) { uploadErr[id] = `${f.name} is over 20 MB.`; continue; }
+    try {
+      const r = await assetsCap.upload(f);
+      (fbFiles[id] = fbFiles[id] || []).push({ id: r.id, url: r.url, name: clean(f.name).slice(0, 120), kind: /^image\//.test(f.type) ? 'image' : 'file' });
+    } catch (e) { uploadErr[id] = `Could not upload ${f.name} (${(e && e.code) || 'error'}).`; }
+  }
+  delete uploading[id]; render();
 }
 
 // Save state per card lives outside the DOM, so a live refresh never hides an error or re-enables
@@ -938,6 +1086,8 @@ async function write(fn) {
 async function act(id, action, text) {
   const it = S.items.find((i) => i.id === id);
   if (!it || !db || saving[id]) return;
+  text = clean(text || '').trim();
+  const files = (fbFiles[id] || []).map((f) => ({ id: f.id, url: f.url, name: f.name, kind: f.kind }));
   saving[id] = true; delete saveErr[id]; render();
   const now = new Date().toISOString();
   try {
@@ -946,11 +1096,11 @@ async function act(id, action, text) {
       if (action === 'approve' && arr(it.recommendations).length > 1) { perQ = {}; it.recommendations.forEach((r, i) => { perQ[String(i + 1)] = r; }); }
       if (action === 'feedback') perQ = parsePerNumber(text);
       await write(() => db.doc(`answers/${id}`).set({ item_id: id, agent: it.agent, project: it.project, title: it.title, decision: action, text: text || '',
-        per_question: perQ, recommendation: it.recommendation || null, meaning: MEANING[action], answered_at: now, read: false }));
+        per_question: perQ, recommendation: it.recommendation || null, meaning: MEANING[action], answered_at: now, read: false, attachments: files }));
       const check = await db.doc(`answers/${id}`).get();
       if (!check.exists) throw { code: 'not_saved' };
-      await write(() => db.doc(`items/${id}`).update({ status: 'answered', needs_me: false, answer: { decision: action, text: text || '', at: now } }));
-      delete drafts[id];
+      await write(() => db.doc(`items/${id}`).update({ status: 'answered', needs_me: false, answer: { decision: action, text: text || '', at: now, attachments: files } }));
+      delete drafts[id]; delete fbFiles[id];
     } else if (action === 'acknowledge') {
       await write(() => db.doc(`items/${id}`).update({ status: it.type === 'idea' ? 'archived' : 'acknowledged', acknowledged_at: now }));
     } else if (action === 'keep_idea') {
@@ -973,6 +1123,7 @@ async function initCloud() {
     const srv = (r.servers || []).find((x) => x.server === CC);
     if (srv && (srv.tools || []).some((t) => t.name === 'create_session')) {
       mcp = m; render();
+      triggerOn = (srv.tools || []).some((t) => t.name === 'create_trigger');
       if ((srv.tools || []).some((t) => t.name === 'get_session')) { costsOn = true; refreshCosts(); setInterval(refreshCosts, 10 * 60000); }
     }
   } catch (e) { mcp = null; }
@@ -987,7 +1138,7 @@ async function checkPerms() {
 }
 
 async function sendMessage(agent, btn) {
-  const text = (msgDrafts[agent] || '').trim();
+  const text = clean(msgDrafts[agent] || '').trim();
   if (!text || !db) return;
   btn.disabled = true;
   try {
@@ -999,7 +1150,7 @@ async function sendMessage(agent, btn) {
 }
 
 function roleOf(a) {
-  for (const [prefix, r] of [['lead', 'lead'], ['architect', 'architect'], ['design', 'designer'], ['review', 'reviewer'], ['security', 'security'], ['sec', 'security'], ['qa', 'qa'], ['usertest', 'usertest'], ['user', 'usertest'], ['persona', 'usertest'], ['test', 'qa'], ['cleanup', 'cleanup'], ['clean', 'cleanup'], ['docs', 'docs']]) if (a.startsWith(prefix)) return r;
+  for (const [prefix, r] of [['lead', 'lead'], ['architect', 'architect'], ['design', 'designer'], ['review', 'reviewer'], ['security', 'security'], ['sec', 'security'], ['qa', 'qa'], ['usertest', 'usertest'], ['user', 'usertest'], ['persona', 'usertest'], ['test', 'qa'], ['cleanup', 'cleanup'], ['clean', 'cleanup'], ['docs', 'docs'], ['codex', 'codex']]) if (a.startsWith(prefix)) return r;
   return 'builder';
 }
 
@@ -1013,7 +1164,7 @@ document.getElementById('add-form').addEventListener('submit', async (e) => {
   err.hidden = true;
   if (!db) { err.textContent = 'The database is not available here. Open this page on claude.ai while signed in.'; err.hidden = false; return; }
   const name = slug(document.getElementById('f-name').value);
-  const brief = document.getElementById('f-brief').value.trim();
+  const brief = clean(document.getElementById('f-brief').value).trim();
   const repo = document.getElementById('f-repo').value.trim();
   // Agent names are unique across projects: "lead" in project gym-app becomes "lead-gym-app".
   const agents = document.getElementById('f-agents').value.split(',').map((s) => slug(s)).filter(Boolean)
@@ -1058,7 +1209,12 @@ document.addEventListener('click', async (e) => {
     setTimeout(() => { t.textContent = 'Copy'; }, 1600);
     return;
   }
-  if (t.dataset.act) { act(t.dataset.id, t.dataset.act); return; }
+  if (t.dataset.act) { if (MEANING[t.dataset.act]) queueAct(t.dataset.id, t.dataset.act); else act(t.dataset.id, t.dataset.act); return; }
+  if (t.dataset.undo) { undoAct(t.dataset.undo); return; }
+  if (t.dataset.wake) { snooze(t.dataset.wake, null); return; }
+  if (t.dataset.fbUnfile) { const l = fbFiles[t.dataset.fbUnfile] || []; l.splice(Number(t.dataset.n), 1); render(); return; }
+  if (t.dataset.resume) { scheduleResume([t.dataset.resume]); return; }
+  if (t.id === 'resume-all') { scheduleResume(limitedAgents().map((a) => a.agent)); return; }
   if (t.dataset.fbOpen) {
     const id = t.dataset.fbOpen;
     if (Object.prototype.hasOwnProperty.call(drafts, id)) delete drafts[id]; else drafts[id] = '';
@@ -1069,7 +1225,7 @@ document.addEventListener('click', async (e) => {
   if (t.dataset.fbSend) {
     const id = t.dataset.fbSend;
     const text = (drafts[id] || '').trim();
-    if (text) act(id, 'feedback', text); else { const i = document.getElementById(`fb-${id}`); if (i) i.focus(); }
+    if (text || (fbFiles[id] || []).length) queueAct(id, 'feedback', text); else { const i = document.getElementById(`fb-${id}`); if (i) i.focus(); }
     return;
   }
   if (t.dataset.filterAgent) { filters.agent = filters.agent === t.dataset.filterAgent ? '' : t.dataset.filterAgent; saveFilters(); render(); return; }
@@ -1156,6 +1312,8 @@ document.addEventListener('toggle', (e) => {
   if (d.open) openDetails.add(d.id); else openDetails.delete(d.id);
 }, true);
 document.addEventListener('change', (e) => {
+  if (e.target.dataset.snooze) { const until = snoozeTime(e.target.value); if (until) snooze(e.target.dataset.snooze, until); return; }
+  if (e.target.dataset.fbFile) { attachFiles(e.target.dataset.fbFile, [...e.target.files]); return; }
   if (e.target.dataset.budget) {
     const name = e.target.dataset.budget;
     const v = e.target.value.trim() === '' ? 0 : Number(e.target.value);
@@ -1178,6 +1336,7 @@ document.addEventListener('change', (e) => {
 
 document.addEventListener('input', (e) => {
   if (e.target.dataset.budget) { budgetDrafts[e.target.dataset.budget] = e.target.value; return; }
+  if (e.target.id === 'search') { searchQ = e.target.value; render(); return; }
   const t = e.target;
   if (t.dataset.pf) { (pfDrafts[t.dataset.pf] = pfDrafts[t.dataset.pf] || {})[t.dataset.field] = t.value; }
   if (t.dataset.fbInput) drafts[t.dataset.fbInput] = t.value;
@@ -1193,7 +1352,7 @@ document.addEventListener('keydown', (e) => {
 });
 document.getElementById('bc-form').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const text = document.getElementById('bc-text').value.trim();
+  const text = clean(document.getElementById('bc-text').value).trim();
   const st = document.getElementById('bc-status');
   const leads = S.agents.filter((a) => a.role === 'lead');
   st.hidden = false;
@@ -1260,6 +1419,7 @@ function subscribe(path, key, query) {
   }
   checkPerms();
   initCloud();
+  try { assetsCap = await useCap('assets'); } catch (e) { assetsCap = null; }
   db.collection('projects').limit(1).get().then((q) => { if (q.empty) document.getElementById('add-panel').hidden = false; }).catch(() => {});
   subscribe('items', 'recentItems', (c) => c.orderBy('timestamp', 'desc').limit(300));
   subscribe('items', 'openItems', (c) => c.where('status', 'in', ['open', 'parked', 'kept']).limit(1000));
