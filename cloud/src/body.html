@@ -1,0 +1,126 @@
+
+<header class="top">
+  <div class="wrap top-row">
+    <div class="brand"><h1>Agent Hub</h1><span class="live off" id="refreshed">Connecting</span></div>
+    <div class="top-actions"><button type="button" class="btn" id="bc-toggle">Message all leads</button><button type="button" class="btn" id="add-toggle">Add project</button></div>
+  </div>
+</header>
+
+<main class="wrap">
+  <p class="banner" id="offline" hidden>This page needs its database to work. Open it from claude.ai while signed in.</p>
+  <p class="banner demo" id="demo-banner" hidden>Demo with sample data: click anything, nothing is saved. <a href="https://github.com/giovannibrees/Claude-Dashboard" target="_blank" rel="noopener">Get your own Agent Hub</a></p>
+  <p class="banner" id="perm" hidden>Your answers cannot be saved: this page is not allowed to save to its database. <button type="button" class="btn" id="perm-fix">Allow saving</button></p>
+
+  <nav class="strip" aria-label="Summary">
+    <button type="button" class="tile" data-jump="needs-block" id="tile-needs"><b id="needs-count">0</b><span>Need you</span></button>
+    <button type="button" class="tile" data-jump="agents-block"><b id="t-running">0</b><span id="t-running-label">Agents running</span></button>
+    <button type="button" class="tile" data-jump="deliveries-block"><b id="t-deliveries">0</b><span>Deliveries to review</span></button>
+    <button type="button" class="tile" data-jump="ideas-block"><b id="t-ideas">0</b><span>Ideas parked</span></button>
+  </nav>
+
+  <section class="panel" id="bc-panel" hidden>
+    <h2>Message all leads</h2>
+    <form id="bc-form" class="form">
+      <label for="bc-text" class="full">Every project lead gets this on its next check (within about 30 minutes) and passes it on to its agents where it applies.
+        <textarea id="bc-text" rows="3" maxlength="800" required placeholder="Example: pause all deploys until Monday; the payment provider is changing."></textarea></label>
+      <div class="actions full"><button class="btn primary" type="submit" id="bc-send">Send to all leads</button><button class="btn" type="button" id="bc-cancel">Cancel</button></div>
+      <p class="hint full" id="bc-status" hidden></p>
+    </form>
+  </section>
+
+  <section class="panel" id="add-panel" hidden>
+    <h2>Add project</h2>
+    <form id="add-form" class="form">
+      <label for="f-name">Project name <input type="text" id="f-name" required placeholder="gym-app"></label>
+      <label for="f-team">Team <select id="f-team">
+        <option value="lead, builder">Solo: lead, builder</option>
+        <option value="lead, builder, reviewer, security" selected>Standard: lead, builder, reviewer, security</option>
+        <option value="lead, builder, reviewer, codex, security">Claude + Codex: lead, builder, reviewer, codex, security</option>
+        <option value="lead, designer, builder, builder-2, reviewer, qa">Product: lead, designer, 2 builders, reviewer, qa</option>
+        <option value="lead, architect, builder, builder-2, reviewer, security, qa">Secure: lead, architect, 2 builders, reviewer, security, qa</option>
+        <option value="lead, builder, reviewer, security, cleanup, usertest">Review: lead, builder, reviewer, security, cleanup, usertest</option>
+      </select></label>
+      <label for="f-agents">Agents (edit to customize) <input type="text" id="f-agents" value="lead, builder, reviewer, security" placeholder="lead, builder, reviewer, security"></label>
+      <label for="f-priority">Priority <select id="f-priority"><option value="P1">P1, most important</option><option value="P2" selected>P2, normal</option><option value="P3">P3, when there is time</option></select></label>
+      <label for="f-repo" class="full">GitHub repo or folder (optional) <input type="text" id="f-repo" placeholder="github.com/you/gym-app or /Users/you/Projects/gym-app"></label>
+      <details class="full brief-help" id="brief-help"><summary>Help me write the brief</summary>
+        <div class="brief-grid">
+          <label for="b-what" class="full">What is it? <input type="text" id="b-what" placeholder="A class booking app for my gym"></label>
+          <label for="b-who" class="full">Who uses it? <input type="text" id="b-who" placeholder="Members, many over 60, mostly on phones; the owner adds classes"></label>
+          <label for="b-must" class="full">Must have (one per line) <textarea id="b-must" rows="3" placeholder="Members book and cancel classes&#10;Owner adds and edits classes&#10;Reminder email the day before"></textarea></label>
+          <label for="b-out" class="full">Not now (out of scope) <input type="text" id="b-out" placeholder="Payments, a native app, chat"></label>
+          <label for="b-deadline">Deadline <input type="text" id="b-deadline" placeholder="4 weeks"></label>
+          <label for="b-where">Where it runs (optional) <input type="text" id="b-where" placeholder="Cloudflare, Vercel, App Store"></label>
+          <div class="full"><button type="button" class="btn" id="b-write">Write the brief</button> <span class="hint" id="b-msg" role="status"></span></div>
+        </div>
+      </details>
+      <label for="f-brief" class="full">Brief <textarea id="f-brief" rows="7" required placeholder="What the app is, who it is for, must-have features, what is out of scope, deadline. The lead agent turns this into a plan and asks you to approve it."></textarea></label>
+      <div class="actions full"><button class="btn primary" type="submit" id="f-submit">Create project</button><button class="btn" type="button" id="add-cancel">Cancel</button></div>
+      <p class="error full" id="add-error" hidden></p>
+    </form>
+    <div id="add-result" hidden></div>
+  </section>
+
+  <div class="board">
+    <div class="maincol">
+      <section class="block" id="digest-block" hidden>
+        <h2>Last 24 hours</h2>
+        <ul class="digest" id="digest"></ul>
+      </section>
+      <section class="block" id="needs-block">
+        <div class="needs-head"><h2>Needs you</h2>
+          <label class="alerts" id="alerts-wrap" hidden>Phone alerts <select id="alerts-level">
+            <option value="important">Important cards</option><option value="all">Every card</option><option value="off">Off</option></select></label></div>
+        <p class="error" id="alerts-err" hidden></p>
+        <p class="banner" id="limit-banner" hidden></p>
+        <div id="needs" class="cards"><p class="empty">Nothing needs you right now.</p></div>
+        <details class="shelf" id="snoozed-wrap" hidden><summary>Snoozed <span class="count" id="snoozed-count"></span></summary>
+          <p class="note">Snoozed cards come back by themselves at their time. A reversible card's 4-hour clock keeps running while it is snoozed.</p>
+          <div id="snoozed" class="cards"></div></details>
+      </section>
+      <section class="block" id="deliveries-block" hidden>
+        <h2>Deliveries <span class="count" id="deliveries-count"></span></h2>
+        <div id="deliveries" class="cards"></div>
+        <details class="shelf" id="deliveries-old-wrap" hidden><summary>Older than 3 days <span class="count" id="deliveries-old-count"></span></summary><div id="deliveries-old" class="cards"></div></details>
+      </section>
+      <section class="block" id="flags-block" hidden>
+        <h2>Lead agent flags <span class="count" id="flags-count"></span></h2>
+        <div id="flags" class="cards"></div>
+        <details class="shelf" id="flags-old-wrap" hidden><summary>Older than 3 days <span class="count" id="flags-old-count"></span></summary><div id="flags-old" class="cards"></div></details>
+      </section>
+      <section class="block">
+        <h2>Feed</h2>
+        <label class="search" for="search">Search all cards <input type="search" id="search" data-search="1" placeholder="Words from a title, bullet, answer, agent or project" autocomplete="off"></label>
+        <form class="filters" id="filters" aria-label="Filters">
+          <label for="flt-agent">Agent</label><select id="flt-agent"></select>
+          <label for="flt-project">Project</label><select id="flt-project"></select>
+          <label for="flt-type">Type</label><select id="flt-type"></select>
+          <button type="button" id="flt-clear" class="link">Clear filters</button>
+        </form>
+        <div id="feed" class="cards"><p class="empty">Agents' updates appear here, newest first.</p></div>
+      </section>
+      <section class="block" id="ideas-block">
+        <details id="ideas-details">
+          <summary><h2>Ideas backlog <span class="count" id="ideas-count">0</span></h2></summary>
+          <div class="cards">
+            <p class="note" id="ideas-note">New ideas and unplanned features wait here until the build is complete. Nothing here gets built without you.</p>
+            <div id="ideas" class="cards"></div>
+          </div>
+        </details>
+      </section>
+      <p class="hint" id="maintenance"></p>
+    </div>
+
+    <aside class="rail">
+      <section class="block" id="agents-block">
+        <h2>Agents <span class="count" id="agents-count"></span></h2>
+        <div id="agents" class="crew"><p class="empty">No agents yet. Add a project, then start its agents with the lines it gives you.</p></div>
+      </section>
+      <section class="block" id="projects-block" hidden>
+        <h2>Projects</h2>
+        <div id="projects" class="cards"></div>
+      </section>
+    </aside>
+  </div>
+</main>
+

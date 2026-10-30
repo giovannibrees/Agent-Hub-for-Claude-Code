@@ -366,6 +366,7 @@ Only you. The page is private on your claude.ai account. Use its Share menu to g
 - [Team guide](docs/TEAMS.md): which agents to pick, how work is split, the checks
 - [Role cards](ROLES.md): what each agent does and never does
 - [Agent rules](cloud/PROTOCOL.md): the rulebook every agent reads from the hub
+- [Changing the hub](docs/DEVELOPING.md): the source files, the build and the browser tests
 
 ## License
 
