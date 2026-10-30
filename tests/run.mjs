@@ -266,6 +266,19 @@ test('An agent that missed its check shows as asleep', async () => {
   await p.done();
 });
 
+test('Progress card shows steps in plain words', async () => {
+  const p = await open();
+  const card = p.locator('#progress article', { hasText: 'gym-app' }).first();
+  const text = await card.textContent();
+  check(/Step \d+ of 10/.test(text), `no step count: ${text.slice(0, 80)}`);
+  check(/Plan approved/.test(text) && /T-1 Signup and login: done/.test(text), 'done steps missing');
+  check(/T-4 Cancel a booking: in checks \(code passed · security running · qa running\)/.test(text), 'check states missing');
+  check(/T-5 Owner adds classes: writing tests for the class form/.test(text), 'doing line missing');
+  check(/Delivery for you to review/.test(text) || /Delivery ready/.test(text) || /Delivered/.test(text), 'delivery step missing');
+  check(/Plan: the lead is writing it/.test(await p.locator('#progress article', { hasText: 'landing-v2' }).textContent()), 'planning project wrong');
+  await p.done();
+});
+
 test('Phone alert level saves', async () => {
   const p = await open();
   await p.selectOption('#alerts-level', 'all');

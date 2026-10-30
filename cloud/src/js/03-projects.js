@@ -208,3 +208,66 @@ function renderFilters() {
   opt('flt-type', Object.keys(TYPE_LABEL), 'types', filters.type);
 }
 
+
+// ---------- progress card: one plain-words timeline per active project ----------
+const CHECK_MARK = { pass: 'passed', fail: 'failed' };
+function progressHtml(p) {
+  const tasks = S.tasks.filter((t) => t.project === p.name).sort((a, b) => String(a.id).localeCompare(String(b.id), undefined, { numeric: true }));
+  const items = S.items.filter((i) => i.project === p.name);
+  const ag = S.agents.filter((a) => a.project === p.name);
+  const byName = Object.fromEntries(ag.map((a) => [a.agent, a]));
+  const steps = [];
+  const plan = items.filter((i) => /^plan\b/i.test(i.title || '') && ['approval', 'question'].includes(i.type)).sort((x, y) => ms(y.timestamp) - ms(x.timestamp))[0];
+  const phase = p.phase || 'planning';
+  if (phase !== 'planning' || (plan && plan.answer && plan.answer.decision === 'approve')) {
+    steps.push({ state: 'done', text: `Plan approved${plan && plan.answer ? ` (${hhmm(plan.answer.at)})` : ''}` });
+  } else if (plan && plan.status === 'open') {
+    steps.push({ state: 'you', text: 'Plan waiting for you in Needs you' });
+  } else {
+    const lead = byName[p.lead] || ag.find((a) => roleOf(a.agent) === 'lead');
+    steps.push({ state: 'now', text: `Plan: the lead is writing it${lead && lead.doing ? ` (${lead.doing})` : ''}` });
+  }
+  for (const t of tasks) {
+    const title = `${t.id} ${t.title || ''}`.trim();
+    if (t.status === 'done') { steps.push({ state: 'done', text: `${title}: done` }); continue; }
+    if (t.status === 'review') {
+      const c = t.checks || {};
+      const list = arr(t.checks_required).map((k) => `${k} ${c[k] ? CHECK_MARK[c[k].result] || c[k].result : 'running'}`).join(' · ');
+      steps.push({ state: 'now', text: `${title}: in checks (${list})` });
+      continue;
+    }
+    if (t.status === 'in-progress') {
+      const o = byName[t.owner] || {};
+      const doing = o.doing || o.last_status_title || 'building';
+      steps.push({ state: 'now', text: `${title}: ${doing}`, sub: `${t.owner || 'builder'} · started ${ago(t.updated_at)}${o.last_seen ? ` · last update ${ago(o.last_seen)}` : ''}${t.review_loops ? ` · round ${t.review_loops + 1} after failed checks` : ''}` });
+      continue;
+    }
+    const waits = arr(t.depends_on).filter((d) => { const dt = tasks.find((x) => x.id === d); return dt && dt.status !== 'done'; });
+    steps.push({ state: 'todo', text: `${title}${waits.length ? ` (after ${waits.join(', ')})` : ''}` });
+  }
+  const delivery = items.filter((i) => i.type === 'delivery').sort((x, y) => ms(y.timestamp) - ms(x.timestamp))[0];
+  if (delivery) steps.push({ state: delivery.status === 'open' ? 'you' : 'done', text: delivery.status === 'open' ? 'Delivery ready for you to review' : 'Delivered' });
+  else steps.push({ state: 'todo', text: 'Delivery for you to review' });
+  const current = steps.findIndex((s) => s.state !== 'done');
+  const stepNo = current === -1 ? steps.length : current + 1;
+  const running = ag.filter(isRunning).length;
+  const asleep = ag.filter(isAsleep).length;
+  const limited = ag.filter(isLimited).length;
+  const need = items.filter((i) => i.needs_me && i.status === 'open' && !isSnoozed(i)).length;
+  const icon = { done: '✓', now: '●', you: '!', todo: '○' };
+  const foot = [`${running} of ${ag.length} agents working`];
+  if (asleep) foot.push(`<strong>${asleep} asleep</strong>`);
+  if (limited) foot.push(`<strong>${limited} stopped on a usage limit</strong>`);
+  foot.push(need ? `<strong>${need} need${need === 1 ? 's' : ''} you</strong>` : 'nothing needs you');
+  return `<article class="card progress">
+    <div class="progress-top"><h3>${esc(p.name)}</h3><span class="count">${current === -1 ? 'Complete' : `Step ${stepNo} of ${steps.length}`}</span></div>
+    <ol class="steps-list">${steps.map((s) => `<li class="${s.state}"><span class="ico" aria-hidden="true">${icon[s.state]}</span><span><span class="sr">${{ done: 'Done: ', now: 'In progress: ', you: 'Needs you: ', todo: 'To do: ' }[s.state]}</span>${esc(s.text)}${s.sub ? `<br><span class="hint">${esc(s.sub)}</span>` : ''}</span></li>`).join('')}</ol>
+    <p class="pstatus">${foot.join(' · ')}</p>
+  </article>`;
+}
+
+function renderProgress() {
+  const list = S.projects.filter((p) => p.phase !== 'complete').sort((a, b) => PRIO_RANK[a.priority || 'P2'] - PRIO_RANK[b.priority || 'P2']);
+  document.getElementById('progress-block').hidden = !list.length;
+  document.getElementById('progress').innerHTML = list.map(progressHtml).join('');
+}

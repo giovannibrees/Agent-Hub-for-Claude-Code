@@ -208,6 +208,8 @@ DATA.items.push({ id: 'i20', timestamp: iso(200), agent: 'lead-landing-v2', proj
   bullets: ['Yearly saves 20%', 'Most visitors compare monthly'], recommendation: 'Show monthly first, yearly as a toggle', snoozed_until: tomorrow9.toISOString() });
 DATA.items.push({ id: 'i21', timestamp: iso(60 * 24 * 5), agent: 'builder-client-portal', project: 'client-portal', type: 'delivery', title: 'Login and password reset', priority: 'normal', status: 'open', needs_me: false,
   bullets: ['Email and password login', 'Reset link valid 1 hour', 'Locked after 5 failed tries'], links: ['https://pr-2.client-portal.example.com'], verification: ['npm test: 64 passed'] });
+const DOING = { 'builder-gym-app': 'writing tests for the class form', 'builder-2-gym-app': 'sending reminder emails through the provider', 'lead-landing-v2': 'reading the brief and past lessons' };
+DATA.agents.forEach((a) => { if (DOING[a.agent]) a.doing = DOING[a.agent]; });
 DATA.config = [{ id: 'alerts', level: 'important' }];
 window.HUB_DEMO.load(DATA);
 </script>
@@ -393,6 +395,18 @@ textarea { width: 100%; resize: vertical; line-height: 1.5; }
 @media (max-width: 600px) { .brief-grid { grid-template-columns: minmax(0, 1fr); } }
 .limit { color: var(--warn); font-weight: 600; }
 .asleep { color: var(--error); font-weight: 600; }
+.progress-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.steps-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.steps-list li { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 8px; align-items: start; }
+.steps-list .ico { font-weight: 700; text-align: center; line-height: 1.55; }
+.steps-list .done { color: var(--muted); }
+.steps-list .done .ico { color: var(--ok); }
+.steps-list .now { font-weight: 600; }
+.steps-list .now .ico { color: var(--accent); }
+.steps-list .you { font-weight: 600; color: var(--accent); }
+.steps-list .todo { color: var(--muted); }
+.steps-list .hint { font-weight: 400; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 .undo { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; background: var(--sunk); border-radius: var(--radius); padding: 8px 12px; }
 .snooze { min-width: 0; width: auto; }
 .attach-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; font-size: 14px; }
@@ -545,6 +559,10 @@ textarea { width: 100%; resize: vertical; line-height: 1.5; }
 
   <div class="board">
     <div class="maincol">
+      <section class="block" id="progress-block" hidden>
+        <h2>Progress</h2>
+        <div id="progress" class="cards"></div>
+      </section>
       <section class="block" id="digest-block" hidden>
         <h2>Last 24 hours</h2>
         <ul class="digest" id="digest"></ul>
@@ -1107,6 +1125,69 @@ function renderFilters() {
   opt('flt-type', Object.keys(TYPE_LABEL), 'types', filters.type);
 }
 
+
+// ---------- progress card: one plain-words timeline per active project ----------
+const CHECK_MARK = { pass: 'passed', fail: 'failed' };
+function progressHtml(p) {
+  const tasks = S.tasks.filter((t) => t.project === p.name).sort((a, b) => String(a.id).localeCompare(String(b.id), undefined, { numeric: true }));
+  const items = S.items.filter((i) => i.project === p.name);
+  const ag = S.agents.filter((a) => a.project === p.name);
+  const byName = Object.fromEntries(ag.map((a) => [a.agent, a]));
+  const steps = [];
+  const plan = items.filter((i) => /^plan\b/i.test(i.title || '') && ['approval', 'question'].includes(i.type)).sort((x, y) => ms(y.timestamp) - ms(x.timestamp))[0];
+  const phase = p.phase || 'planning';
+  if (phase !== 'planning' || (plan && plan.answer && plan.answer.decision === 'approve')) {
+    steps.push({ state: 'done', text: `Plan approved${plan && plan.answer ? ` (${hhmm(plan.answer.at)})` : ''}` });
+  } else if (plan && plan.status === 'open') {
+    steps.push({ state: 'you', text: 'Plan waiting for you in Needs you' });
+  } else {
+    const lead = byName[p.lead] || ag.find((a) => roleOf(a.agent) === 'lead');
+    steps.push({ state: 'now', text: `Plan: the lead is writing it${lead && lead.doing ? ` (${lead.doing})` : ''}` });
+  }
+  for (const t of tasks) {
+    const title = `${t.id} ${t.title || ''}`.trim();
+    if (t.status === 'done') { steps.push({ state: 'done', text: `${title}: done` }); continue; }
+    if (t.status === 'review') {
+      const c = t.checks || {};
+      const list = arr(t.checks_required).map((k) => `${k} ${c[k] ? CHECK_MARK[c[k].result] || c[k].result : 'running'}`).join(' · ');
+      steps.push({ state: 'now', text: `${title}: in checks (${list})` });
+      continue;
+    }
+    if (t.status === 'in-progress') {
+      const o = byName[t.owner] || {};
+      const doing = o.doing || o.last_status_title || 'building';
+      steps.push({ state: 'now', text: `${title}: ${doing}`, sub: `${t.owner || 'builder'} · started ${ago(t.updated_at)}${o.last_seen ? ` · last update ${ago(o.last_seen)}` : ''}${t.review_loops ? ` · round ${t.review_loops + 1} after failed checks` : ''}` });
+      continue;
+    }
+    const waits = arr(t.depends_on).filter((d) => { const dt = tasks.find((x) => x.id === d); return dt && dt.status !== 'done'; });
+    steps.push({ state: 'todo', text: `${title}${waits.length ? ` (after ${waits.join(', ')})` : ''}` });
+  }
+  const delivery = items.filter((i) => i.type === 'delivery').sort((x, y) => ms(y.timestamp) - ms(x.timestamp))[0];
+  if (delivery) steps.push({ state: delivery.status === 'open' ? 'you' : 'done', text: delivery.status === 'open' ? 'Delivery ready for you to review' : 'Delivered' });
+  else steps.push({ state: 'todo', text: 'Delivery for you to review' });
+  const current = steps.findIndex((s) => s.state !== 'done');
+  const stepNo = current === -1 ? steps.length : current + 1;
+  const running = ag.filter(isRunning).length;
+  const asleep = ag.filter(isAsleep).length;
+  const limited = ag.filter(isLimited).length;
+  const need = items.filter((i) => i.needs_me && i.status === 'open' && !isSnoozed(i)).length;
+  const icon = { done: '✓', now: '●', you: '!', todo: '○' };
+  const foot = [`${running} of ${ag.length} agents working`];
+  if (asleep) foot.push(`<strong>${asleep} asleep</strong>`);
+  if (limited) foot.push(`<strong>${limited} stopped on a usage limit</strong>`);
+  foot.push(need ? `<strong>${need} need${need === 1 ? 's' : ''} you</strong>` : 'nothing needs you');
+  return `<article class="card progress">
+    <div class="progress-top"><h3>${esc(p.name)}</h3><span class="count">${current === -1 ? 'Complete' : `Step ${stepNo} of ${steps.length}`}</span></div>
+    <ol class="steps-list">${steps.map((s) => `<li class="${s.state}"><span class="ico" aria-hidden="true">${icon[s.state]}</span><span><span class="sr">${{ done: 'Done: ', now: 'In progress: ', you: 'Needs you: ', todo: 'To do: ' }[s.state]}</span>${esc(s.text)}${s.sub ? `<br><span class="hint">${esc(s.sub)}</span>` : ''}</span></li>`).join('')}</ol>
+    <p class="pstatus">${foot.join(' · ')}</p>
+  </article>`;
+}
+
+function renderProgress() {
+  const list = S.projects.filter((p) => p.phase !== 'complete').sort((a, b) => PRIO_RANK[a.priority || 'P2'] - PRIO_RANK[b.priority || 'P2']);
+  document.getElementById('progress-block').hidden = !list.length;
+  document.getElementById('progress').innerHTML = list.map(progressHtml).join('');
+}
 function bulletsHtml(it) {
   const b = arr(it.bullets);
   if (!b.length) return '';
@@ -1213,7 +1294,7 @@ function render() {
   const focusId = a && a.id && (a.dataset.fbInput || a.dataset.msgInput || a.dataset.pf || a.dataset.budget || a.dataset.search) && a.tagName === 'INPUT' ? a.id : null;
   const caret = focusId ? a.selectionStart : null;
 
-  renderFilters(); renderAgents(); renderProjects(); renderDigest();
+  renderFilters(); renderAgents(); renderProjects(); renderDigest(); renderProgress();
   const items = S.items.filter(passes);
   const allItems = S.items; // Needs you, deliveries, flags and ideas are never hidden by filters
   const openNeeds = allItems.filter((i) => i.needs_me && i.status === 'open');

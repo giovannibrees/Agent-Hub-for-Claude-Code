@@ -436,6 +436,14 @@ because deleting it from the code does not make it safe again: the key has to be
 
 ## 9. Running several projects
 
+### Progress
+
+The top of the page shows one card per active project: every step in plain words, from the
+approved plan through each task to the delivery. A green tick is done, an orange dot is happening
+now with what the agent is doing ("writing tests for URL cleanup"), an open circle is still to
+come, and an exclamation mark needs you. The bottom line counts the agents working, asleep or
+stopped on a usage limit, and the cards that need you.
+
 ### Last 24 hours
 
 The top of the page shows one line per project, most important first: tasks done, deliveries,

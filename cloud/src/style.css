@@ -175,6 +175,18 @@ textarea { width: 100%; resize: vertical; line-height: 1.5; }
 @media (max-width: 600px) { .brief-grid { grid-template-columns: minmax(0, 1fr); } }
 .limit { color: var(--warn); font-weight: 600; }
 .asleep { color: var(--error); font-weight: 600; }
+.progress-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.steps-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.steps-list li { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 8px; align-items: start; }
+.steps-list .ico { font-weight: 700; text-align: center; line-height: 1.55; }
+.steps-list .done { color: var(--muted); }
+.steps-list .done .ico { color: var(--ok); }
+.steps-list .now { font-weight: 600; }
+.steps-list .now .ico { color: var(--accent); }
+.steps-list .you { font-weight: 600; color: var(--accent); }
+.steps-list .todo { color: var(--muted); }
+.steps-list .hint { font-weight: 400; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 .undo { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; background: var(--sunk); border-radius: var(--radius); padding: 8px 12px; }
 .snooze { min-width: 0; width: auto; }
 .attach-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; font-size: 14px; }

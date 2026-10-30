@@ -45,7 +45,10 @@ block work. Roles: lead, architect, designer, builder, reviewer, security, qa, u
 You run inside `/loop`. Each iteration, in this order:
 
 1. Heartbeat: `update` collection `agents`, doc_id = your name, data
-   `{"last_seen": "<now ISO>", "state": "working", "current_task": "<id or empty>"}`.
+   `{"last_seen": "<now ISO>", "state": "working", "current_task": "<id or empty>",
+   "doing": "<what you are doing right now, plain words, max 80 characters>"}`. The CEO's progress
+   card shows `doing`, for example "writing tests for URL cleanup" or "waiting for T-1 to reach
+   review".
    Read the doc first (`get`) and pass its `version` as `if_version`.
 2. Answers: `query` collection `answers` with where `[["agent","==","<you>"],["read","==",false]]`.
    Act on each, then `update` it with `{"read": true}` (with `if_version`).

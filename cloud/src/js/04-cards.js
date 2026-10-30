@@ -104,7 +104,7 @@ function render() {
   const focusId = a && a.id && (a.dataset.fbInput || a.dataset.msgInput || a.dataset.pf || a.dataset.budget || a.dataset.search) && a.tagName === 'INPUT' ? a.id : null;
   const caret = focusId ? a.selectionStart : null;
 
-  renderFilters(); renderAgents(); renderProjects(); renderDigest();
+  renderFilters(); renderAgents(); renderProjects(); renderDigest(); renderProgress();
   const items = S.items.filter(passes);
   const allItems = S.items; // Needs you, deliveries, flags and ideas are never hidden by filters
   const openNeeds = allItems.filter((i) => i.needs_me && i.status === 'open');

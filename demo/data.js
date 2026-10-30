@@ -76,5 +76,7 @@ DATA.items.push({ id: 'i20', timestamp: iso(200), agent: 'lead-landing-v2', proj
   bullets: ['Yearly saves 20%', 'Most visitors compare monthly'], recommendation: 'Show monthly first, yearly as a toggle', snoozed_until: tomorrow9.toISOString() });
 DATA.items.push({ id: 'i21', timestamp: iso(60 * 24 * 5), agent: 'builder-client-portal', project: 'client-portal', type: 'delivery', title: 'Login and password reset', priority: 'normal', status: 'open', needs_me: false,
   bullets: ['Email and password login', 'Reset link valid 1 hour', 'Locked after 5 failed tries'], links: ['https://pr-2.client-portal.example.com'], verification: ['npm test: 64 passed'] });
+const DOING = { 'builder-gym-app': 'writing tests for the class form', 'builder-2-gym-app': 'sending reminder emails through the provider', 'lead-landing-v2': 'reading the brief and past lessons' };
+DATA.agents.forEach((a) => { if (DOING[a.agent]) a.doing = DOING[a.agent]; });
 DATA.config = [{ id: 'alerts', level: 'important' }];
 window.HUB_DEMO.load(DATA);
