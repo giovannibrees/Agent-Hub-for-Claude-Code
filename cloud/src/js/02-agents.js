@@ -73,8 +73,11 @@ function stoppedCount(project) { return S.agents.filter((a) => a.project === pro
 // Agents write next_check_at when they schedule their next check. One that missed it by more
 // than 10 minutes has most likely been shut down while idle.
 const ASLEEP_MS = 10 * 60000;
-function isAsleep(a) { return !!(a.next_check_at && a.state !== 'delivered' && Date.now() - ms(a.next_check_at) > ASLEEP_MS); }
+// Started from the hub but never checked in: the session did not take its first instruction.
+function neverCheckedIn(a) { return !!(a.started_at && !a.last_seen && a.state !== 'delivered' && Date.now() - ms(a.started_at) > ASLEEP_MS); }
+function isAsleep(a) { return neverCheckedIn(a) || !!(a.next_check_at && a.state !== 'delivered' && Date.now() - ms(a.next_check_at) > ASLEEP_MS); }
 function nextCheckHtml(a) {
+  if (neverCheckedIn(a)) return `<p class="asleep">Never checked in since it was started at ${esc(hhmm(a.started_at))}. Open its session to see why.</p>`;
   if (!a.next_check_at || a.state === 'delivered') return '';
   if (isAsleep(a)) return `<p class="asleep">Asleep: missed its check at ${esc(hhmm(a.next_check_at))}. Open its session and send any message to wake it.</p>`;
   return ms(a.next_check_at) > Date.now() ? `<p class="hint">Next check ${esc(hhmm(a.next_check_at))}</p>` : '';

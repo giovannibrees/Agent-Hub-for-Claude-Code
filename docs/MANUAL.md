@@ -117,7 +117,7 @@ them to run agents on your own computer:
    claude.ai/code, the Claude desktop app, or `claude` in a terminal.
 2. Switch the session to **auto mode** (Shift+Tab in the terminal, or the mode menu in the app)
    so the agent can write to the hub without asking you each time.
-3. Paste the start line. It begins with `/loop`, which keeps the agent working on its own.
+3. Paste the start line. The agent checks in, works, and schedules its own next check, so it keeps going on its own.
 
 ### Write a brief the lead can plan from
 
@@ -616,7 +616,7 @@ The full rules are in [cloud/PROTOCOL.md](../cloud/PROTOCOL.md). In short:
 | Problem | Fix |
 |---|---|
 | An agent keeps asking permission to write to the hub | Switch its session to auto mode, or approve once and allow ArtifactData for the session. |
-| An agent shows Idle | It has not checked in for 30 minutes. Click **Start again** on its card, or open its session and paste the start line again. Loops end after 7 days. |
+| An agent shows Idle | It has not checked in for 30 minutes. Click **Start again** on its card, or open its session and send any message to wake it. |
 | Answers do not save | The page shows "Not saved" on the card and an **Allow saving** banner. Click it and allow the page's database, then answer again. |
 | No **Start in the cloud** button | The page was published without the Claude Code connector, or you turned it off in the page's Permissions menu. Paste the start lines instead. |
 | "Your organization does not allow starting sessions from a page" | Use **Copy start request** on the project card and paste it into a Claude Code session you start yourself. |

@@ -241,7 +241,7 @@ test('Blocked start: buttons hide, Copy start request appears with the right tex
   const btn = p.locator('.project', { hasText: 'gym-app' }).first().locator('[data-copy-start]');
   check(await btn.count() === 1, 'no Copy start request on the project card');
   const text = await p.evaluate(() => startRequest('gym-app'));
-  check(/create_session/.test(text) && /builder-2-gym-app/.test(text) && /\/loop You are agent "builder-2-gym-app"/.test(text) && /permission_mode "auto"/.test(text), 'start request text incomplete');
+  check(/create_session/.test(text) && /builder-2-gym-app/.test(text) && /You are agent "builder-2-gym-app"/.test(text) && /send_later/.test(text) && /permission_mode "auto"/.test(text), 'start request text incomplete');
   await p.done();
 });
 
@@ -276,6 +276,17 @@ test('Progress card shows steps in plain words', async () => {
   check(/T-5 Owner adds classes: writing tests for the class form/.test(text), 'doing line missing');
   check(/Delivery for you to review/.test(text) || /Delivery ready/.test(text) || /Delivered/.test(text), 'delivery step missing');
   check(/Plan: the lead is writing it/.test(await p.locator('#progress article', { hasText: 'landing-v2' }).textContent()), 'planning project wrong');
+  await p.done();
+});
+
+test('An agent that was started but never checked in shows as asleep', async () => {
+  const p = await open();
+  await p.evaluate(async () => {
+    const db = await window.HUB_DEMO.use('db');
+    await db.doc('agents/fresh-gym-app').set({ agent: 'fresh-gym-app', project: 'gym-app', role: 'builder', started_at: new Date(Date.now() - 16 * 60000).toISOString(), state: 'started' });
+  });
+  await p.waitForTimeout(300);
+  check(/Never checked in/.test(await p.locator('.agent', { hasText: 'fresh-gym-app' }).textContent()), 'no never-checked-in warning');
   await p.done();
 });
 

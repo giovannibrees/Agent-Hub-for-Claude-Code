@@ -42,7 +42,7 @@ block work. Roles: lead, architect, designer, builder, reviewer, security, qa, u
 
 ## 2. Every loop iteration
 
-You run inside `/loop`. Each iteration, in this order:
+Each check is one iteration. Do not rely on `/loop`: it is not available in every session, and an idle session can be shut down. Each iteration, in this order:
 
 1. Heartbeat: `update` collection `agents`, doc_id = your name, data
    `{"last_seen": "<now ISO>", "state": "working", "current_task": "<id or empty>",
@@ -61,7 +61,7 @@ You run inside `/loop`. Each iteration, in this order:
    you posted it, then about 15 minutes. Blocked on everything else and only waiting for
    answers: about 60 minutes between checks. Delivered: end the loop.
 6. Schedule your next check so it survives: an idle session can be shut down, and a wait inside
-   `/loop` is then lost. At the end of every iteration, call the `send_later` tool of the
+   the session is then lost. At the end of every iteration, call the `send_later` tool of the
    Claude Code Remote connector (ToolSearch `select:mcp__claude-code-remote__send_later`) with
    `delay_minutes` set to your pace and the message "Agent Hub check: run your next loop
    iteration." Write the time into your agents doc as `next_check_at` (in the same heartbeat

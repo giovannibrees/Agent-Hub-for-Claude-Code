@@ -151,7 +151,7 @@ function roleOf(a) {
 }
 
 function startLine(name, role, project, repo) {
-  return `/loop You are agent "${name}" (role: ${role}) on project "${project}" in the Agent Hub at ${HUB_URL}${repo ? ` for the code in ${repo}` : ''}. First read the hub rules and your role card with ArtifactData: action get, url ${HUB_URL}, collection "config", doc_id "protocol" (then doc_id "roles", section "## ${role}"). Follow them for this whole session. The CEO only reads the hub, never this chat.`;
+  return `You are agent "${name}" (role: ${role}) on project "${project}" in the Agent Hub at ${HUB_URL}${repo ? ` for the code in ${repo}` : ''}. First read the hub rules and your role card with ArtifactData: action get, url ${HUB_URL}, collection "config", doc_id "protocol" (then doc_id "roles", section "## ${role}"). Run one check now, and at the end of every check schedule the next one with send_later as the rules say (section 2, step 6). Follow them for this whole session. The CEO only reads the hub, never this chat.`;
 }
 
 document.getElementById('add-form').addEventListener('submit', async (e) => {
