@@ -64,6 +64,12 @@ const DATA = {
 const SESS = { 'lead-gym-app': 'session_demo_lead', 'builder-gym-app': 'session_demo_b1', 'builder-2-gym-app': 'session_demo_b2', 'reviewer-gym-app': 'session_demo_rev' };
 DATA.agents.forEach((a) => { if (SESS[a.agent]) { a.session_id = SESS[a.agent]; } });
 DATA.projects.forEach((p) => { if (p.name === 'gym-app') p.budget_usd = 75; });
+// Auto-build: project types, a live URL with Ship it, and a project built by the Lean team.
+DATA.projects.forEach((p) => {
+  if (p.name === 'gym-app') { p.kind = 'saas'; p.live_url = 'book.fitclub.example'; }
+  if (p.name === 'client-portal') p.kind = 'webapp';
+  if (p.name === 'landing-v2') { p.kind = 'landing'; p.live_url = 'fitclub.example'; }
+});
 DATA.tasks.forEach((t) => {
   if (t.id === 'T-4') { t.pr = { url: 'https://github.com/acme/gym-app/pull/14', number: 14, ci: 'pass', checked_at: iso(9) }; t.preview_url = 'https://pr-14.gym-app.example.com'; }
   if (t.id === 'T-5') t.pr = { url: 'https://github.com/acme/gym-app/pull/15', number: 15, ci: 'pending', checked_at: iso(4) };

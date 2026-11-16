@@ -146,7 +146,7 @@ async function sendMessage(agent, btn) {
 }
 
 function roleOf(a) {
-  for (const [prefix, r] of [['lead', 'lead'], ['architect', 'architect'], ['design', 'designer'], ['review', 'reviewer'], ['security', 'security'], ['sec', 'security'], ['qa', 'qa'], ['usertest', 'usertest'], ['user', 'usertest'], ['persona', 'usertest'], ['test', 'qa'], ['cleanup', 'cleanup'], ['clean', 'cleanup'], ['docs', 'docs'], ['codex', 'codex']]) if (a.startsWith(prefix)) return r;
+  for (const [prefix, r] of [['lead', 'lead'], ['architect', 'architect'], ['design', 'designer'], ['review', 'reviewer'], ['security', 'security'], ['sec', 'security'], ['qa', 'qa'], ['usertest', 'usertest'], ['user', 'usertest'], ['persona', 'usertest'], ['test', 'qa'], ['cleanup', 'cleanup'], ['clean', 'cleanup'], ['docs', 'docs'], ['codex', 'codex'], ['checker', 'checker'], ['check', 'checker']]) if (a.startsWith(prefix)) return r;
   return 'builder';
 }
 
@@ -162,6 +162,8 @@ document.getElementById('add-form').addEventListener('submit', async (e) => {
   const name = slug(document.getElementById('f-name').value);
   const brief = clean(document.getElementById('f-brief').value).trim();
   const repo = document.getElementById('f-repo').value.trim();
+  const kind = document.getElementById('f-kind').value;
+  const liveUrl = document.getElementById('f-live').value.trim();
   // Agent names are unique across projects: "lead" in project gym-app becomes "lead-gym-app".
   const agents = document.getElementById('f-agents').value.split(',').map((s) => slug(s)).filter(Boolean)
     .map((a) => (a.endsWith(`-${slug(document.getElementById('f-name').value)}`) ? a : `${a}-${slug(document.getElementById('f-name').value)}`));
@@ -172,7 +174,7 @@ document.getElementById('add-form').addEventListener('submit', async (e) => {
   btn.disabled = true;
   try {
     const now = new Date().toISOString();
-    await db.doc(`projects/${name}`).set({ name, goal: brief.split('\n')[0].replace(/^#+\s*/, '').slice(0, 160), brief, repo, phase: 'planning', priority: document.getElementById('f-priority').value,
+    await db.doc(`projects/${name}`).set({ name, goal: brief.split('\n')[0].replace(/^#+\s*/, '').slice(0, 160), brief, repo, kind, live_url: liveUrl, phase: 'planning', priority: document.getElementById('f-priority').value,
       scope: [], never: [], lead: agents.find((a) => role(a) === 'lead') || '', agents: agents.map((a) => ({ name: a, role: role(a) })), created_at: now });
     for (const a of agents) await db.doc(`agents/${a}`).set({ agent: a, project: name, role: role(a), registered_at: now, state: 'registered' });
     const out = document.getElementById('add-result');

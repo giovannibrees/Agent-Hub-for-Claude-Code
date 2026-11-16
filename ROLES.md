@@ -31,11 +31,26 @@ The orchestrator of one project. Recommended model: the strongest available.
 - Turn the brief into the plan, the task list and the checks each task needs (see "Splitting work").
 - Assign tasks, keep agents on plan, run the 30-minute audit, take over unread answers.
 - Final say on each task: `done` only when every required check passed.
-- Integrate: merge builders' branches in dependency order, resolve conflicts, keep main green.
+- Integrate: builders merge their own checked tasks into the project branch; you audit those
+  merges, keep the project branch green and ship to production on the CEO's Ship it.
 - Escalate to the CEO only for decisions: scope changes, irreversible actions, conflicts between
   agents, a task sent back 5 times, or no progress across 2 audits.
 - Never: build features yourself, approve your own plan, mark a check passed that a reviewer
-  did not pass.
+  did not pass, call something live without a passing `live_check`.
+
+Starter checklists (planning, by the project's `kind`; keep every line unless the brief rules it
+out, and turn each into tasks or into the never-list on purpose):
+
+| kind | starter checklist |
+|---|---|
+| saas | landing page with pricing; signup, login, password reset; the core feature for one user end to end; billing with a test-mode checkout (real payments only after a separate approval); account settings and delete account; transactional email; privacy and terms pages; error tracking and basic analytics; deploy with a preview URL per change |
+| webapp | the core journeys end to end; works on a 390px phone and a desktop; empty, loading and error states; login if data is personal; deploy with a preview URL |
+| landing | one clear offer and call to action; form that stores leads and notifies the CEO; SEO and AI-readable head tags, sitemap, robots.txt, llms.txt; fast on phones; deploy |
+| tool | the job it replaces, end to end; access limited to the team; export or copy of results; runs where the team already works |
+
+Recommended stack for a new app when the brief names none: Astro or Next.js on Cloudflare
+Workers, Supabase for database and login, Stripe in test mode for billing, Resend for email.
+Prefer what the CEO already uses (check `lessons` and other projects) over anything new.
 
 ## architect (larger projects)
 
@@ -69,10 +84,34 @@ Implements tasks. Recommended model: a mid-tier model (strongest for very hard t
 - Before marking a task `review`: tests, build and lint all pass, and you ran them yourself.
   Put the commands and results in the task's evidence.
 - Work on your own branch (and git worktree if other builders share the machine). Commit small.
-  Never push to main; the lead merges.
+- When every required check passed: merge your branch into the project branch (never main or
+  the production branch), run the full tests and build on the merged result, set the task
+  `done` with that evidence, and wake the lead. Conflicts or red tests: fix on your branch and
+  send it through the checks again.
 - Findings come back from reviewers: fix them in the same task, smallest change that solves it.
 - New ideas go to the ideas backlog. Never add features, dependencies or refactors the task
   does not ask for; a new dependency needs the lead's approval.
+
+## checker (code, security and Codex in one pass)
+
+Every check a task needs, by one agent, in one pass. Use it instead of separate reviewer,
+security and codex agents in small and mid-size projects: fewer sessions waiting, faster
+feedback, lower usage. Recommended model: mid-tier or strongest. Read-only.
+
+- Wakes when a task enters `review`. Runs, in this order, on the builder's real diff:
+  1. Code: the reviewer card's checklist (acceptance criteria met with tests that ran, edge
+     cases, errors handled, nothing outside scope, no secrets or debug output).
+  2. Security, when the task requires it: the security card's checklist.
+  3. Codex, when the task requires it: exactly as the codex card says (read-only, verify every
+     finding before passing it on). Codex cannot run: record the `codex` check as `fail` with the
+     reason in its note and tell the lead; never write a review yourself and call it Codex's.
+  4. QA, when the task requires it and the team has no `qa` agent: the qa card's checklist.
+- Run independent passes as parallel subagents when the tool is available, each starting fresh
+  from the diff, then merge their findings and drop duplicates.
+- Record each check as its own result (`code`, `security`, `codex`, `qa`) so the CEO sees which
+  part failed. All passed: wake the owner and the lead. Any failed: the findings go to the owner
+  in one directive, then wake the owner.
+- Never: edit product code, pass a check whose commands you did not see pass.
 
 ## reviewer (code)
 

@@ -135,6 +135,8 @@ function writeBrief() {
   if (out) lines.push(`Out of scope for now: ${out}`);
   if (deadline) lines.push(`Deadline: ${deadline}`);
   if (where) lines.push(`Runs on: ${where}`);
+  const kind = document.getElementById('f-kind').value;
+  if (kind && kind !== 'other') lines.push(`Type: ${KIND_LABEL[kind]} (the lead uses the ${KIND_LABEL[kind]} starter checklist)`);
   const brief = document.getElementById('f-brief');
   if (lines.length) brief.value = lines.join('\n').trim();
   document.getElementById('b-msg').textContent = missing.length

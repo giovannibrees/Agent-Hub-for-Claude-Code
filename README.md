@@ -29,6 +29,17 @@ projects and agents. Approve cards, start agents, set a budget: nothing is saved
 
 ## What's new
 
+**Describe it, approve it, ship it.** Pick what you are building (SaaS, web app, landing page,
+internal tool) and the lead plans from a starter checklist, tells you which accounts to connect,
+and stops at four checkpoints: plan, design, first preview, and delivery. Press **Ship it** and
+the lead merges, deploys and confirms the change is on your live site before it says "live".
+
+**A leaner, faster team.** The new Lean team (lead, builder, checker) runs code review, security
+and Codex in one pass, builders merge their own checked work, and agents wake each other within a
+minute. An hourly watchdog wakes any agent that dozed off.
+
+**A cleaner look.** Easier to read in light and dark, with clear status at a glance.
+
 **Claude builds, Codex reviews.** Pick the **Claude + Codex** team and every task also gets a
 second opinion from OpenAI's Codex. Claude stays the lead and the builder; a codex agent runs
 Codex's review on each change, checks every finding against the real code, and sends confirmed

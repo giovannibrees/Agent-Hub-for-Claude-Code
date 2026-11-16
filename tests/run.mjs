@@ -26,12 +26,14 @@ const tests = [];
 const test = (name, fn) => tests.push({ name, fn });
 function check(cond, msg) { if (!cond) throw new Error(msg); }
 
-async function open({ width = 1300, height = 950, faults, scheme = 'light', mobile = false } = {}) {
+async function open({ width = 1300, height = 950, faults, scheme = 'light', mobile = false, undoMs } = {}) {
   const ctx = await browser.newContext({ viewport: { width, height }, isMobile: mobile, colorScheme: scheme });
   const p = await ctx.newPage();
   p.errors = [];
   p.on('pageerror', (e) => p.errors.push(String(e)));
   if (faults) await p.addInitScript((f) => { window.HUB_FAULTS = f; }, faults);
+  // A longer Undo window for tests that press Undo (the page's own 150 ms setting is then ignored).
+  if (undoMs) await p.addInitScript((v) => { Object.defineProperty(window, 'HUB_UNDO_MS', { value: v, writable: false }); }, undoMs);
   await p.goto(URL_);
   await p.waitForFunction(() => document.querySelectorAll('#needs article').length > 0);
   await p.waitForTimeout(300);
@@ -43,7 +45,7 @@ const dbGet = (p, path) => p.evaluate(async (path) => { const d = await (await w
 
 // ---------- answers ----------
 test('Approve waits for Undo, then saves the answer', async () => {
-  const p = await open();
+  const p = await open({ undoMs: 1500 });
   const c = card(p, 'Payments before');
   await c.locator('[data-act=approve]').click();
   check(await c.locator('.undo').count() === 1, 'no Undo shown');
@@ -51,7 +53,7 @@ test('Approve waits for Undo, then saves the answer', async () => {
   check(await c.locator('[data-act=approve]').count() === 1, 'Undo did not restore the buttons');
   check(!(await dbGet(p, 'answers/i1')), 'answer saved despite Undo');
   await c.locator('[data-act=approve]').click();
-  await p.waitForTimeout(600);
+  await p.waitForTimeout(2200);
   const a = await dbGet(p, 'answers/i1');
   check(a && a.decision === 'approve', 'answer not saved');
   check(await card(p, 'Payments before').count() === 0, 'card still in Needs you');
@@ -193,6 +195,46 @@ test('New project: lead starts first, github.com link without https', async () =
   await p.done();
 });
 
+test('Ship it on a delivery saves a ship decision after Undo time', async () => {
+  const p = await open();
+  const c = card(p, 'Booking flow released', '#deliveries');
+  check(await c.locator('[data-act=ship]').count() === 1, 'no Ship it button');
+  check(/book\.fitclub\.example/.test(await c.textContent()), 'no live URL hint');
+  await c.locator('[data-act=ship]').click();
+  check(await c.locator('.undo').count() === 1, 'no Undo shown');
+  await p.waitForTimeout(600);
+  const a = await dbGet(p, 'answers/i4');
+  check(a && a.decision === 'ship' && /live URL/.test(a.meaning), `bad answer ${JSON.stringify(a)}`);
+  await p.done();
+});
+
+test('New project saves its type and live URL; checker gets the checker role', async () => {
+  const p = await open();
+  await p.click('#add-toggle');
+  check(await p.inputValue('#f-agents') === 'lead, builder, checker', 'Lean is not the default team');
+  await p.fill('#f-name', 'notes'); await p.selectOption('#f-kind', 'saas'); await p.fill('#f-live', 'notes.example.com');
+  await p.fill('#f-brief', 'A notes app.');
+  await p.click('#f-submit'); await p.waitForTimeout(400);
+  const proj = await dbGet(p, 'projects/notes');
+  check(proj && proj.kind === 'saas' && proj.live_url === 'notes.example.com', `bad project ${JSON.stringify(proj)}`);
+  const chk = await dbGet(p, 'agents/checker-notes');
+  check(chk && chk.role === 'checker', `bad checker ${JSON.stringify(chk)}`);
+  const prog = await p.locator('#progress article', { hasText: 'notes' }).first().textContent();
+  check(/Design for you to approve/.test(prog) && /Live on notes\.example\.com/.test(prog), `no checkpoints: ${prog.slice(0, 120)}`);
+  await p.done();
+});
+
+test('A rejected design checkpoint does not show as approved', async () => {
+  const p = await open();
+  await p.evaluate(async () => { const db = await window.HUB_DEMO.use('db');
+    await db.doc('items/dz').set({ id: 'dz', timestamp: new Date().toISOString(), agent: 'lead-landing-v2', project: 'landing-v2', type: 'approval', title: 'Design for landing-v2',
+      status: 'answered', needs_me: false, answer: { decision: 'reject', at: new Date().toISOString() } }); });
+  await p.waitForTimeout(400);
+  const prog = await p.locator('#progress article', { hasText: 'landing-v2' }).first().textContent();
+  check(!/Design approved/.test(prog) && /Design: being reworked/.test(prog), `wrong design step: ${prog.slice(0, 160)}`);
+  await p.done();
+});
+
 test('Brief helper writes the brief and names what is missing', async () => {
   const p = await open();
   await p.click('#add-toggle'); await p.click('#brief-help summary');
@@ -270,7 +312,9 @@ test('Progress card shows steps in plain words', async () => {
   const p = await open();
   const card = p.locator('#progress article', { hasText: 'gym-app' }).first();
   const text = await card.textContent();
-  check(/Step \d+ of 10/.test(text), `no step count: ${text.slice(0, 80)}`);
+  check(/Step \d+ of 12/.test(text), `no step count: ${text.slice(0, 80)}`);
+  check(/First preview link for you to try/.test(text) && /Live on book\.fitclub\.example/.test(text), 'no preview or live step');
+  check(/press Ship it/.test(text), 'delivery step does not mention Ship it');
   check(/Plan approved/.test(text) && /T-1 Signup and login: done/.test(text), 'done steps missing');
   check(/T-4 Cancel a booking: in checks \(code passed · security running · qa running\)/.test(text), 'check states missing');
   check(/T-5 Owner adds classes: writing tests for the class form/.test(text), 'doing line missing');

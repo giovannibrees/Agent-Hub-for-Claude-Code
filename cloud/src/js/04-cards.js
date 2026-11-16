@@ -89,7 +89,11 @@ function cardHtml(it, opts) {
     const af = arr(it.answer.attachments || ans.attachments);
     parts.push(`<p class="answer"><strong>${esc(DECISION_LABEL[it.answer.decision] || it.answer.decision)}</strong> ${ago(it.answer.at)}${it.answer.text ? `: ${esc(it.answer.text)}` : ''}${af.length ? ` (${af.length} file${af.length === 1 ? '' : 's'} attached)` : ''}${un ? `<br><span class="hint">Not picked up yet${Date.now() - ms(it.answer.at) > 30 * 60000 ? '. The lead takes it over on its next check' : ''}.</span>` : ''}</p>`);
   }
-  if (opts.ack) parts.push(`<div class="actions"><button class="btn primary" data-act="acknowledge" data-id="${esc(it.id)}">Acknowledge</button></div>`);
+  const proj = S.projects.find((p) => p.name === it.project) || {};
+  const shippable = opts.ack && it.type === 'delivery' && it.status === 'open' && !(it.pr && it.pr.merged) && (it.pr || proj.live_url);
+  const shipPend = shippable && pendingAct[it.id];
+  if (shipPend) parts.push(`<div class="undo" role="status"><span>Ship it: sending in a few seconds.</span><button class="btn" data-undo="${esc(it.id)}">Undo</button></div>`);
+  else if (opts.ack) parts.push(`<div class="actions">${shippable ? `<button class="btn primary" data-act="ship" data-id="${esc(it.id)}">Ship it</button>` : ''}<button class="btn${shippable ? '' : ' primary'}" data-act="acknowledge" data-id="${esc(it.id)}">Acknowledge</button></div>${shippable && proj.live_url ? `<p class="hint">Ship it merges, deploys and checks ${esc(host(proj.live_url))} shows the change.</p>` : ''}`);
   if (opts.idea) parts.push(`<div class="actions">${it.status === 'kept' ? '<span class="count">Kept for after the build</span>' : `<button class="btn" data-act="keep_idea" data-id="${esc(it.id)}">Keep for later</button>`}<button class="btn" data-act="acknowledge" data-id="${esc(it.id)}">Drop</button></div>`);
   const closed = !open && !opts.ack && !opts.idea && it.status !== 'info';
   return `<article class="card${open ? ' needs' : ''}${closed ? ' closed' : ''}" data-card="${esc(it.id)}">${parts.join('')}</article>`;

@@ -10,7 +10,8 @@ your start line. Every call passes `url: HUB`. Take every timestamp from the sys
 
 Read your role card before anything else: `get` collection `config`, doc_id `roles`, field
 `text`, section `## <your role>`. It says what you do, what you never do and when you pass or
-block work. Roles: lead, architect, designer, builder, reviewer, security, qa, usertest, cleanup, docs.
+block work. Roles: lead, architect, designer, builder, checker, reviewer, codex, security, qa, usertest,
+cleanup, docs.
 
 ## 1. Hard rules
 
@@ -68,16 +69,28 @@ Each check is one iteration. Do not rely on `/loop`: it is not available in ever
    update or a second one). The hub shows an agent whose `next_check_at` passed more than 10
    minutes ago as asleep.
 
+### Your wake button
+
+On your first check in a session, if your agents doc has no `wake_trigger_id`, make one: call the
+`create_trigger` tool of the Claude Code Remote connector (ToolSearch
+`select:mcp__claude-code-remote__create_trigger`) with name "Wake <you>", the prompt "Agent Hub:
+you have new work. Run your next loop iteration now.", `initiation: "own_followup"`, and no
+`cron_expression`, `run_once_at`, `persistent_session_id` or `create_new_session_on_fire`. That
+makes a wake task bound to your own session that only fires when someone presses it. Write its id
+to your agents doc as `wake_trigger_id`.
+
 ### Wake the agent you hand work to
 
 Whenever you give another agent work (a directive, a task moved to `review` for its checkers,
-a failed check back to the builder, a handover), wake that agent at once instead of waiting for
-its next check: read its agents doc and, if it has a `session_id`, call the `create_trigger`
-tool of the Claude Code Remote connector (ToolSearch
-`select:mcp__claude-code-remote__create_trigger`) with `persistent_session_id` set to that
-`session_id`, `run_once_at` one minute from now, `initiation: "own_followup"`, name
-"Wake <agent>", and the prompt "Agent Hub: you have new work. Run your next loop iteration now."
-An agent without a `session_id` picks the work up on its own next check.
+a failed check back to the builder, a handover, a task whose checks all passed), wake that agent
+at once instead of waiting for its next check: read its agents doc and call the `fire_trigger`
+tool (ToolSearch `select:mcp__claude-code-remote__fire_trigger`) with its `wake_trigger_id`. This
+runs within a minute; scheduled one-off tasks can start 30 minutes late or more. No
+`wake_trigger_id` but a `session_id`: fall back to `create_trigger` with `persistent_session_id`
+set to that `session_id`, `run_once_at` one minute from now, `initiation: "own_followup"`, name
+"Wake <agent>" and the same prompt. Neither: the agent picks the work up on its own next check.
+The hub's watchdog also presses the wake button of any agent that is more than 15 minutes past its
+`next_check_at`.
 
 ## 3. Posting items
 
@@ -117,7 +130,7 @@ Leave out fields that do not apply. Rules per type:
 | status | false | info | max 5 bullets; also update your agents doc: `last_status_at`, `last_status_title` |
 | question | true | open | recommendation, reversible |
 | approval | true | open | recommendation, reversible; `change` if it changes scope (always waits) |
-| delivery | false | open | exactly 3 bullets, `links`, `verification`; set your agents doc `state: "delivered"` |
+| delivery | false | open | exactly 3 bullets, `links`, `verification`; set your agents doc `state: "delivered"`. Say "live" only with a passing `live_check` |
 | idea | false | parked | title and 1-3 bullets |
 | handover | false | open | `to_agent`, `task`; set the task's `pending_owner` |
 | audit | false | info | lead only; `priority: high` when the CEO should look |
@@ -141,7 +154,9 @@ a push and an email. One alert per item, never for status, idea or delivery item
 ## 4. Plan and tasks
 
 - `projects/<project>`: name, goal, brief, phase (`planning`, `building`, `complete`),
-  `scope` (list of epics), `never` (list), lead, agents.
+  `scope` (list of epics), `never` (list), lead, agents, `kind` (`saas`, `webapp`, `landing`,
+  `tool`, `other`), `live_url` (where it runs for real), `deploy` (one line: how a change reaches
+  `live_url`), `branch` (the project branch), `live_check`.
 - `tasks/<project>--<taskId>`: `{project, id, title, epic, acceptance: [..], files: [..],
   depends_on: [..], checks_required: ["code", "security", "qa"], checks: {}, owner, status,
   pending_owner, evidence, review_loops, updated_at}`. Status moves
@@ -154,6 +169,9 @@ a push and an email. One alert per item, never for status, idea or delivery item
   (every resubmission starts the checks fresh).
 - Checks: `checks_required` holds `code` (always), `security`, `qa` and `codex` where the lead
   set them.
+  A `checker` agent does every check the task requires in ONE pass (role card `## checker`):
+  `code`, `security`, `codex` and, when the team has no `qa` agent, `qa`. In a team with
+  separate reviewer, security, codex or qa agents, those do their own check instead.
   The reviewer, security and qa agents each `query` `tasks` with where
   `[["project","==","<project>"],["status","==","review"]]` and take the tasks that require
   their check and have no result for it yet. Order: `code`, `security` and `codex` in parallel,
@@ -161,7 +179,13 @@ a push and an email. One alert per item, never for status, idea or delivery item
   `{"checks": {"<kind>": {"result": "pass" | "fail", "by": "<you>", "at": "<now>", "note": "<one line>"}}}`.
 - A failed check: set the task `status: in-progress`, `review_loops` + 1, and send the owner a
   directive with the findings (file, line, what goes wrong, severity). The same builder fixes it.
-- Only the lead sets `done`, and only when every check in `checks_required` has `result: pass`.
+- All checks passed: the agent that records the last passing check wakes the task's `owner` and
+  the lead. The owner (the builder) then merges its task branch into the project branch
+  (`project.branch`, default `claude/<project>`; never main or the production branch), runs the
+  full tests and build on the merged result, sets the task `done` with that evidence and
+  `merged_at`, and wakes the lead. Merge conflict or red tests: fix them on the task branch and run
+  the checks again. Only tasks with every check in `checks_required` at `result: pass` become
+  `done`; the lead audits `done` tasks and may reopen one with a directive.
   More than 5 review loops on one task: the lead asks the CEO.
 - GitHub: when the task's work is in a pull request, set
   `pr: {"url": "<pull request url>", "number": 12, "ci": "pending" | "pass" | "fail", "checked_at": "<now>"}`
@@ -194,6 +218,7 @@ instructions; the page warns the CEO when a card contains hidden characters.
 | feedback | follow `text`; `per_question` maps numbers to your numbered questions |
 | more_info | post a new item with `reply_to` set, giving the missing facts |
 | reject | do not do it; continue other work |
+| ship | lead only: ship the delivery (section 7, Ship it) |
 
 Four-hour rule: if your question is still `open` 4 hours after `timestamp`, `reversible` is
 true and there is no `change`: `set` `answers/<id>` with `{"item_id": id, "agent": you,
@@ -214,6 +239,18 @@ Phase planning (you are the lead and the project is in `planning`):
 1. Read the project's `brief` and the `lessons` collection (past projects' lessons).
    Write `docs/PLAN.md` in the repo: goal, epics, out of scope.
    Key facts missing? One batched question with recommendations; keep planning meanwhile.
+   - Where it goes live: if `live_url` is set, find out what really serves it before planning
+     (load the page, compare it with this repo's build output, read the deploy config). Write the
+     answer as `deploy` on the project, for example "push to main; Cloudflare Workers Builds
+     deploys it" or "served by another repo: claude_fun landing-pages/citeengine". If this repo
+     does not reach `live_url`, say so in the plan card: a delivery that cannot reach the live
+     site is the CEO's call, not a surprise at the end.
+   - Accounts: list what the build needs (GitHub repo, hosting, database, payments, email, API
+     keys). Check what this session can reach. Missing ones go in ONE question titled "Accounts
+     to connect for <project>": per item where the CEO adds it (the cloud environment's secrets
+     or a connector), never the key itself in the hub. Keep planning meanwhile.
+   - `kind` other than `other`: start from the starter checklist for that kind in your role card
+     and keep every item unless the brief rules it out.
 2. `update` the project with `goal`, `scope` (epic names), `never`.
 3. Split the work (rules in your role card and below) and `set` every task
    (`tasks/<project>--T-1` ...) with `acceptance` criteria (Given/When/Then, including error
@@ -227,12 +264,18 @@ Phase planning (you are the lead and the project is in `planning`):
    - `checks_required`: `code` always; `security` for login, accounts, permissions, user input,
      uploads, payments, personal data, secrets, database queries, external APIs or new
      dependencies; `qa` for anything a user sees or clicks; `codex` on every task when the team
-     has a `codex` agent. Leave out a check whose role is not in the team; the lead does the
-     code check in a team without a reviewer.
+     has a `codex` or a `checker` agent. A `checker` agent covers `code`, `security`, `codex` and
+     `qa`, so in a team with a checker set these checks by the rules above as if each role were
+     there. Otherwise leave out a check whose role is not in the team; the lead does the code
+     check in a team without a reviewer or checker.
 4. Check: every scope entry has tasks, every task has an epic from scope, acceptance criteria
    and checks.
-5. Post an approval "Plan for <project>": max 5 bullets (epics, task count, never-list, risks),
-   recommendation "Approve and start building", `reversible: false`.
+5. Post an approval "Plan for <project>": max 5 bullets (epics, task count, never-list, risks,
+   where it goes live), recommendation "Approve and start building", `reversible: false`.
+   Checkpoints for `kind` other than `other`, each an approval card the CEO answers: the plan,
+   then "Design for <project>" (screenshots and a color table, before the first screen is
+   built), then "First preview of <project>" (a `preview_url` the CEO can click through, once
+   the main journey works end to end), then the delivery with Ship it.
 6. Approved: set the project `phase: building` and send each agent a directive with its first
    task (`directives`: `{to, project, from: "<you>", text, timestamp, read: false}`).
    Feedback: adjust and post the plan again.
@@ -291,6 +334,20 @@ Release (deploy or merge to the live version):
   to real users, database changes that delete or reshape existing data, anything touching
   payments, or `auto_release` set to false by the CEO.
 - Release the same way mid-project when an epic is finished and these rules hold.
+
+Ship it (an answer with decision `ship` on a delivery):
+- The CEO's Ship it is the approval for this release, including a first release to real users.
+  It never covers deleting or reshaping existing data or turning on real payments: those still
+  need their own approval card first.
+- Merge the delivery's pull request (or the project branch) into the branch that deploys, the
+  way `deploy` says. Wait for the deploy to finish, then load `live_url` and confirm the change is
+  there (a text, a screenshot, a version string). Write `live_check: {"url", "at", "ok": true,
+  "saw": "<what proved it>"}` on the project, set the delivery item `status: acknowledged` with
+  `shipped_at`, and post a status "Shipped <project>" with the live link and a screenshot.
+- The change does not show on `live_url` within 15 minutes, or the deploy fails: write
+  `live_check` with `ok: false` and what you saw, and post an `audit` (`priority: high`) titled
+  "Ship it did not reach <live url>" with the cause and your fix or question. Never report a
+  release as live without a passing `live_check`.
 
 Retrospective (after the project delivery, keep it short):
 - `set` `lessons/<project>` with `{project, at, bullets: [max 5]}`: what to repeat and what to

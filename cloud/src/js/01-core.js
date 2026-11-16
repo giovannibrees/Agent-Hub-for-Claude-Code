@@ -3,13 +3,16 @@
 const HUB_URL = 'HUB_URL_PLACEHOLDER';
 const STALE_MIN = 30;
 const TYPE_LABEL = { status: 'Status', question: 'Question', approval: 'Approval', delivery: 'Delivery', idea: 'Idea', handover: 'Handover', audit: 'Audit' };
-const DECISION_LABEL = { approve: 'Approved', feedback: 'Feedback', more_info: 'Asked for more info', reject: 'Not approved', auto: 'Auto-proceeded (no answer in 4h)' };
+const DECISION_LABEL = { approve: 'Approved', feedback: 'Feedback', more_info: 'Asked for more info', reject: 'Not approved', auto: 'Auto-proceeded (no answer in 4h)', ship: 'Ship it' };
 const MEANING = {
   approve: 'Approved. Proceed with your recommendation (all numbered recommendations if batched).',
   feedback: 'Follow the feedback text. Numbered answers map to your numbered questions.',
   more_info: 'Not decided yet. Post a new item with reply_to set to this id that gives the missing information.',
   reject: 'Not approved. Do not do this. Continue other work; post a new question only if you are blocked.',
+  ship: 'Ship it. Merge this delivery, deploy it the way the project deploys, then load the live URL and confirm the change is there (protocol section 7, Ship it).',
 };
+const KIND_LABEL = { saas: 'SaaS', landing: 'Landing page', webapp: 'Web app', tool: 'Internal tool', other: 'Other' };
+const host = (u) => { try { return new URL(/^https?:/.test(u) ? u : `https://${u}`).host; } catch (e) { return String(u || ''); } };
 
 let db = null;
 let searchQ = '';

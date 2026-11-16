@@ -8,6 +8,7 @@ task gets checked before it counts as done. The role cards the agents follow are
 
 | Team | Agents | Use it for |
 |---|---|---|
+| Lean (recommended) | lead, builder, checker | Most new apps. One checker runs code review, security and Codex in one pass. |
 | Solo | lead, builder | Small fixes, landing pages, internal scripts. The lead reviews. |
 | Standard | lead, builder, reviewer, security | Most apps. |
 | Claude + Codex | lead, builder, reviewer, codex, security | Most apps, with a second opinion from OpenAI's Codex on every task. |
@@ -17,7 +18,7 @@ task gets checked before it counts as done. The role cards the agents follow are
 
 The **Add project** form has these presets. You can also type your own list; the agent name sets
 the role: names starting with `lead`, `architect`, `design`, `review`, `security`, `qa`, `usertest`,
-`cleanup`, `docs` or `codex`
+`cleanup`, `docs`, `codex` or `checker`
 get that role, everything else is a builder (`builder`, `builder-2`, `api`, `frontend`).
 
 Rules of thumb:
@@ -54,12 +55,16 @@ The lead sets the checks each task needs when planning:
 | qa | qa (or the designer for pure visual work) | anything a user sees or clicks |
 | codex | codex | every task, when the team has a codex agent |
 
+In a Lean team the **checker** agent runs code, security, Codex (and QA when there is no qa
+agent) in one pass and records each as its own result.
+
 The order is fixed:
 
 1. **Builder** runs tests, build and lint, records the results, and moves the task to review.
 2. **Reviewer, security and Codex** check the real code at the same time. All are read-only.
 3. **QA** tests it from the user's side once the code checks pass.
-4. **Lead** marks it done only when every required check passed.
+4. **Builder** merges its own task into the project branch once every required check passed,
+   runs the full tests on the merged result and marks it done. The lead audits these merges.
 
 A failed check sends the task back to the same builder with the findings. After 5 rounds on one
 task, the lead asks you what to do. Before the project is delivered, security does one sweep over

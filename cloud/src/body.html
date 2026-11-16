@@ -33,15 +33,24 @@
     <form id="add-form" class="form">
       <label for="f-name">Project name <input type="text" id="f-name" required placeholder="gym-app"></label>
       <label for="f-team">Team <select id="f-team">
+        <option value="lead, builder, checker" selected>Lean: lead, builder, checker (recommended)</option>
         <option value="lead, builder">Solo: lead, builder</option>
-        <option value="lead, builder, reviewer, security" selected>Standard: lead, builder, reviewer, security</option>
+        <option value="lead, builder, reviewer, security">Standard: lead, builder, reviewer, security</option>
         <option value="lead, builder, reviewer, codex, security">Claude + Codex: lead, builder, reviewer, codex, security</option>
         <option value="lead, designer, builder, builder-2, reviewer, qa">Product: lead, designer, 2 builders, reviewer, qa</option>
         <option value="lead, architect, builder, builder-2, reviewer, security, qa">Secure: lead, architect, 2 builders, reviewer, security, qa</option>
         <option value="lead, builder, reviewer, security, cleanup, usertest">Review: lead, builder, reviewer, security, cleanup, usertest</option>
       </select></label>
-      <label for="f-agents">Agents (edit to customize) <input type="text" id="f-agents" value="lead, builder, reviewer, security" placeholder="lead, builder, reviewer, security"></label>
+      <label for="f-agents">Agents (edit to customize) <input type="text" id="f-agents" value="lead, builder, checker" placeholder="lead, builder, checker"></label>
       <label for="f-priority">Priority <select id="f-priority"><option value="P1">P1, most important</option><option value="P2" selected>P2, normal</option><option value="P3">P3, when there is time</option></select></label>
+      <label for="f-kind">What are you building? <select id="f-kind">
+        <option value="saas">SaaS: accounts, payments, a landing page</option>
+        <option value="webapp">Web app: works on phones and desktops</option>
+        <option value="landing">Landing page or website</option>
+        <option value="tool">Internal tool for my team</option>
+        <option value="other" selected>Something else, or a change to an existing app</option>
+      </select></label>
+      <label for="f-live">Live URL, where it runs for real (optional) <input type="text" id="f-live" placeholder="citeengine.com or leave empty for a new app"></label>
       <label for="f-repo" class="full">GitHub repo or folder (optional) <input type="text" id="f-repo" placeholder="github.com/you/gym-app or /Users/you/Projects/gym-app"></label>
       <details class="full brief-help" id="brief-help"><summary>Help me write the brief</summary>
         <div class="brief-grid">

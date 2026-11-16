@@ -177,6 +177,7 @@ function renderProjects() {
       ${costHtml(p)}
       <label class="auto" for="auto-${esc(p.name)}"><input type="checkbox" id="auto-${esc(p.name)}" data-auto="${esc(p.name)}"${p.auto_release === false ? '' : ' checked'}> Release automatically when all checks pass</label>
       ${p.goal ? `<p>${esc(p.goal)}</p>` : ''}
+      ${p.kind && p.kind !== 'other' || p.live_url ? `<p class="hint">${p.kind && KIND_LABEL[p.kind] ? esc(KIND_LABEL[p.kind]) : ''}${p.kind && p.kind !== 'other' && p.live_url ? ' · ' : ''}${p.live_url ? `live at <a href="${esc(/^https?:/.test(p.live_url) ? p.live_url : `https://${p.live_url}`)}" target="_blank" rel="noopener">${esc(host(p.live_url))}</a>${p.live_check && p.live_check.ok ? ' (checked)' : ''}` : ''}</p>` : ''}
       <div class="seg" role="img" aria-label="${n.done} of ${tasks.length} tasks done">${seg}</div>
       <div class="legend">${tasks.length ? order.filter((st) => n[st]).map((st) => `<span><i class="${st}"></i>${n[st]} ${label[st]}</span>`).join('') : `<span>${p.phase === 'planning' ? 'The lead is writing the plan' : 'No tasks yet'}</span>`}${ideas ? `<span>${ideas} idea${ideas === 1 ? '' : 's'} parked</span>` : ''}</div>
       <details id="plan-${esc(p.name)}" data-keep${openDetails.has(`plan-${p.name}`) ? ' open' : ''}><summary>Plan and tasks</summary>
@@ -227,6 +228,18 @@ function progressHtml(p) {
     const lead = byName[p.lead] || ag.find((a) => roleOf(a.agent) === 'lead');
     steps.push({ state: 'now', text: `Plan: the lead is writing it${lead && lead.doing ? ` (${lead.doing})` : ''}` });
   }
+  const newApp = p.kind && p.kind !== 'other';
+  const gate = (re) => items.filter((i) => re.test(i.title || '') && ['approval', 'question'].includes(i.type)).sort((x, y) => ms(y.timestamp) - ms(x.timestamp))[0];
+  const gateStep = (g, label, todo) => {
+    const d = g && g.answer && g.answer.decision;
+    if (d === 'approve' || d === 'auto' || (g && g.status === 'auto_resolved')) return { state: 'done', text: `${label} approved` };
+    if (g && g.status === 'open') return { state: 'you', text: `${label} waiting for you in Needs you` };
+    if (g) return { state: 'now', text: `${label}: being reworked after your ${DECISION_LABEL[d] ? DECISION_LABEL[d].toLowerCase() : 'answer'}` };
+    return newApp ? { state: 'todo', text: todo } : null;
+  };
+  const designGate = gate(/\bdesign\b/i);
+  const design = designGate || phase === 'planning' ? gateStep(designGate, 'Design', 'Design for you to approve') : null;
+  if (design) steps.push(design);
   for (const t of tasks) {
     const title = `${t.id} ${t.title || ''}`.trim();
     if (t.status === 'done') { steps.push({ state: 'done', text: `${title}: done` }); continue; }
@@ -245,9 +258,19 @@ function progressHtml(p) {
     const waits = arr(t.depends_on).filter((d) => { const dt = tasks.find((x) => x.id === d); return dt && dt.status !== 'done'; });
     steps.push({ state: 'todo', text: `${title}${waits.length ? ` (after ${waits.join(', ')})` : ''}` });
   }
+  const preview = gateStep(gate(/^preview\b|\bfirst preview\b/i), 'First preview', 'First preview link for you to try');
+  if (preview) steps.push(preview);
   const delivery = items.filter((i) => i.type === 'delivery').sort((x, y) => ms(y.timestamp) - ms(x.timestamp))[0];
-  if (delivery) steps.push({ state: delivery.status === 'open' ? 'you' : 'done', text: delivery.status === 'open' ? 'Delivery ready for you to review' : 'Delivered' });
-  else steps.push({ state: 'todo', text: 'Delivery for you to review' });
+  const ship = p.live_url ? ' and press Ship it' : '';
+  if (delivery) steps.push({ state: delivery.status === 'open' ? 'you' : 'done', text: delivery.status === 'open' ? `Delivery ready for you to review${ship}` : 'Delivered' });
+  else steps.push({ state: 'todo', text: `Delivery for you to review${ship}` });
+  if (p.live_url) {
+    const lc = p.live_check || {};
+    const shipping = delivery && delivery.answer && delivery.answer.decision === 'ship' && !lc.ok;
+    steps.push(lc.ok ? { state: 'done', text: `Live on ${host(p.live_url)}`, sub: lc.at ? `checked ${ago(lc.at)}` : '' }
+      : shipping ? { state: 'now', text: `Shipping to ${host(p.live_url)}` }
+      : { state: 'todo', text: `Live on ${host(p.live_url)}` });
+  }
   const current = steps.findIndex((s) => s.state !== 'done');
   const stepNo = current === -1 ? steps.length : current + 1;
   const running = ag.filter(isRunning).length;

@@ -356,15 +356,24 @@ textarea { width: 100%; resize: vertical; line-height: 1.5; }
     <form id="add-form" class="form">
       <label for="f-name">Project name <input type="text" id="f-name" required placeholder="gym-app"></label>
       <label for="f-team">Team <select id="f-team">
+        <option value="lead, builder, checker" selected>Lean: lead, builder, checker (recommended)</option>
         <option value="lead, builder">Solo: lead, builder</option>
-        <option value="lead, builder, reviewer, security" selected>Standard: lead, builder, reviewer, security</option>
+        <option value="lead, builder, reviewer, security">Standard: lead, builder, reviewer, security</option>
         <option value="lead, builder, reviewer, codex, security">Claude + Codex: lead, builder, reviewer, codex, security</option>
         <option value="lead, designer, builder, builder-2, reviewer, qa">Product: lead, designer, 2 builders, reviewer, qa</option>
         <option value="lead, architect, builder, builder-2, reviewer, security, qa">Secure: lead, architect, 2 builders, reviewer, security, qa</option>
         <option value="lead, builder, reviewer, security, cleanup, usertest">Review: lead, builder, reviewer, security, cleanup, usertest</option>
       </select></label>
-      <label for="f-agents">Agents (edit to customize) <input type="text" id="f-agents" value="lead, builder, reviewer, security" placeholder="lead, builder, reviewer, security"></label>
+      <label for="f-agents">Agents (edit to customize) <input type="text" id="f-agents" value="lead, builder, checker" placeholder="lead, builder, checker"></label>
       <label for="f-priority">Priority <select id="f-priority"><option value="P1">P1, most important</option><option value="P2" selected>P2, normal</option><option value="P3">P3, when there is time</option></select></label>
+      <label for="f-kind">What are you building? <select id="f-kind">
+        <option value="saas">SaaS: accounts, payments, a landing page</option>
+        <option value="webapp">Web app: works on phones and desktops</option>
+        <option value="landing">Landing page or website</option>
+        <option value="tool">Internal tool for my team</option>
+        <option value="other" selected>Something else, or a change to an existing app</option>
+      </select></label>
+      <label for="f-live">Live URL, where it runs for real (optional) <input type="text" id="f-live" placeholder="citeengine.com or leave empty for a new app"></label>
       <label for="f-repo" class="full">GitHub repo or folder (optional) <input type="text" id="f-repo" placeholder="github.com/you/gym-app or /Users/you/Projects/gym-app"></label>
       <details class="full brief-help" id="brief-help"><summary>Help me write the brief</summary>
         <div class="brief-grid">
@@ -457,13 +466,16 @@ textarea { width: 100%; resize: vertical; line-height: 1.5; }
 const HUB_URL = 'HUB_URL_PLACEHOLDER';
 const STALE_MIN = 30;
 const TYPE_LABEL = { status: 'Status', question: 'Question', approval: 'Approval', delivery: 'Delivery', idea: 'Idea', handover: 'Handover', audit: 'Audit' };
-const DECISION_LABEL = { approve: 'Approved', feedback: 'Feedback', more_info: 'Asked for more info', reject: 'Not approved', auto: 'Auto-proceeded (no answer in 4h)' };
+const DECISION_LABEL = { approve: 'Approved', feedback: 'Feedback', more_info: 'Asked for more info', reject: 'Not approved', auto: 'Auto-proceeded (no answer in 4h)', ship: 'Ship it' };
 const MEANING = {
   approve: 'Approved. Proceed with your recommendation (all numbered recommendations if batched).',
   feedback: 'Follow the feedback text. Numbered answers map to your numbered questions.',
   more_info: 'Not decided yet. Post a new item with reply_to set to this id that gives the missing information.',
   reject: 'Not approved. Do not do this. Continue other work; post a new question only if you are blocked.',
+  ship: 'Ship it. Merge this delivery, deploy it the way the project deploys, then load the live URL and confirm the change is there (protocol section 7, Ship it).',
 };
+const KIND_LABEL = { saas: 'SaaS', landing: 'Landing page', webapp: 'Web app', tool: 'Internal tool', other: 'Other' };
+const host = (u) => { try { return new URL(/^https?:/.test(u) ? u : `https://${u}`).host; } catch (e) { return String(u || ''); } };
 
 let db = null;
 let searchQ = '';
@@ -666,6 +678,8 @@ function writeBrief() {
   if (out) lines.push(`Out of scope for now: ${out}`);
   if (deadline) lines.push(`Deadline: ${deadline}`);
   if (where) lines.push(`Runs on: ${where}`);
+  const kind = document.getElementById('f-kind').value;
+  if (kind && kind !== 'other') lines.push(`Type: ${KIND_LABEL[kind]} (the lead uses the ${KIND_LABEL[kind]} starter checklist)`);
   const brief = document.getElementById('f-brief');
   if (lines.length) brief.value = lines.join('\n').trim();
   document.getElementById('b-msg').textContent = missing.length
@@ -924,6 +938,7 @@ function renderProjects() {
       ${costHtml(p)}
       <label class="auto" for="auto-${esc(p.name)}"><input type="checkbox" id="auto-${esc(p.name)}" data-auto="${esc(p.name)}"${p.auto_release === false ? '' : ' checked'}> Release automatically when all checks pass</label>
       ${p.goal ? `<p>${esc(p.goal)}</p>` : ''}
+      ${p.kind && p.kind !== 'other' || p.live_url ? `<p class="hint">${p.kind && KIND_LABEL[p.kind] ? esc(KIND_LABEL[p.kind]) : ''}${p.kind && p.kind !== 'other' && p.live_url ? ' · ' : ''}${p.live_url ? `live at <a href="${esc(/^https?:/.test(p.live_url) ? p.live_url : `https://${p.live_url}`)}" target="_blank" rel="noopener">${esc(host(p.live_url))}</a>${p.live_check && p.live_check.ok ? ' (checked)' : ''}` : ''}</p>` : ''}
       <div class="seg" role="img" aria-label="${n.done} of ${tasks.length} tasks done">${seg}</div>
       <div class="legend">${tasks.length ? order.filter((st) => n[st]).map((st) => `<span><i class="${st}"></i>${n[st]} ${label[st]}</span>`).join('') : `<span>${p.phase === 'planning' ? 'The lead is writing the plan' : 'No tasks yet'}</span>`}${ideas ? `<span>${ideas} idea${ideas === 1 ? '' : 's'} parked</span>` : ''}</div>
       <details id="plan-${esc(p.name)}" data-keep${openDetails.has(`plan-${p.name}`) ? ' open' : ''}><summary>Plan and tasks</summary>
@@ -974,6 +989,18 @@ function progressHtml(p) {
     const lead = byName[p.lead] || ag.find((a) => roleOf(a.agent) === 'lead');
     steps.push({ state: 'now', text: `Plan: the lead is writing it${lead && lead.doing ? ` (${lead.doing})` : ''}` });
   }
+  const newApp = p.kind && p.kind !== 'other';
+  const gate = (re) => items.filter((i) => re.test(i.title || '') && ['approval', 'question'].includes(i.type)).sort((x, y) => ms(y.timestamp) - ms(x.timestamp))[0];
+  const gateStep = (g, label, todo) => {
+    const d = g && g.answer && g.answer.decision;
+    if (d === 'approve' || d === 'auto' || (g && g.status === 'auto_resolved')) return { state: 'done', text: `${label} approved` };
+    if (g && g.status === 'open') return { state: 'you', text: `${label} waiting for you in Needs you` };
+    if (g) return { state: 'now', text: `${label}: being reworked after your ${DECISION_LABEL[d] ? DECISION_LABEL[d].toLowerCase() : 'answer'}` };
+    return newApp ? { state: 'todo', text: todo } : null;
+  };
+  const designGate = gate(/\bdesign\b/i);
+  const design = designGate || phase === 'planning' ? gateStep(designGate, 'Design', 'Design for you to approve') : null;
+  if (design) steps.push(design);
   for (const t of tasks) {
     const title = `${t.id} ${t.title || ''}`.trim();
     if (t.status === 'done') { steps.push({ state: 'done', text: `${title}: done` }); continue; }
@@ -992,9 +1019,19 @@ function progressHtml(p) {
     const waits = arr(t.depends_on).filter((d) => { const dt = tasks.find((x) => x.id === d); return dt && dt.status !== 'done'; });
     steps.push({ state: 'todo', text: `${title}${waits.length ? ` (after ${waits.join(', ')})` : ''}` });
   }
+  const preview = gateStep(gate(/^preview\b|\bfirst preview\b/i), 'First preview', 'First preview link for you to try');
+  if (preview) steps.push(preview);
   const delivery = items.filter((i) => i.type === 'delivery').sort((x, y) => ms(y.timestamp) - ms(x.timestamp))[0];
-  if (delivery) steps.push({ state: delivery.status === 'open' ? 'you' : 'done', text: delivery.status === 'open' ? 'Delivery ready for you to review' : 'Delivered' });
-  else steps.push({ state: 'todo', text: 'Delivery for you to review' });
+  const ship = p.live_url ? ' and press Ship it' : '';
+  if (delivery) steps.push({ state: delivery.status === 'open' ? 'you' : 'done', text: delivery.status === 'open' ? `Delivery ready for you to review${ship}` : 'Delivered' });
+  else steps.push({ state: 'todo', text: `Delivery for you to review${ship}` });
+  if (p.live_url) {
+    const lc = p.live_check || {};
+    const shipping = delivery && delivery.answer && delivery.answer.decision === 'ship' && !lc.ok;
+    steps.push(lc.ok ? { state: 'done', text: `Live on ${host(p.live_url)}`, sub: lc.at ? `checked ${ago(lc.at)}` : '' }
+      : shipping ? { state: 'now', text: `Shipping to ${host(p.live_url)}` }
+      : { state: 'todo', text: `Live on ${host(p.live_url)}` });
+  }
   const current = steps.findIndex((s) => s.state !== 'done');
   const stepNo = current === -1 ? steps.length : current + 1;
   const running = ag.filter(isRunning).length;
@@ -1109,7 +1146,11 @@ function cardHtml(it, opts) {
     const af = arr(it.answer.attachments || ans.attachments);
     parts.push(`<p class="answer"><strong>${esc(DECISION_LABEL[it.answer.decision] || it.answer.decision)}</strong> ${ago(it.answer.at)}${it.answer.text ? `: ${esc(it.answer.text)}` : ''}${af.length ? ` (${af.length} file${af.length === 1 ? '' : 's'} attached)` : ''}${un ? `<br><span class="hint">Not picked up yet${Date.now() - ms(it.answer.at) > 30 * 60000 ? '. The lead takes it over on its next check' : ''}.</span>` : ''}</p>`);
   }
-  if (opts.ack) parts.push(`<div class="actions"><button class="btn primary" data-act="acknowledge" data-id="${esc(it.id)}">Acknowledge</button></div>`);
+  const proj = S.projects.find((p) => p.name === it.project) || {};
+  const shippable = opts.ack && it.type === 'delivery' && it.status === 'open' && !(it.pr && it.pr.merged) && (it.pr || proj.live_url);
+  const shipPend = shippable && pendingAct[it.id];
+  if (shipPend) parts.push(`<div class="undo" role="status"><span>Ship it: sending in a few seconds.</span><button class="btn" data-undo="${esc(it.id)}">Undo</button></div>`);
+  else if (opts.ack) parts.push(`<div class="actions">${shippable ? `<button class="btn primary" data-act="ship" data-id="${esc(it.id)}">Ship it</button>` : ''}<button class="btn${shippable ? '' : ' primary'}" data-act="acknowledge" data-id="${esc(it.id)}">Acknowledge</button></div>${shippable && proj.live_url ? `<p class="hint">Ship it merges, deploys and checks ${esc(host(proj.live_url))} shows the change.</p>` : ''}`);
   if (opts.idea) parts.push(`<div class="actions">${it.status === 'kept' ? '<span class="count">Kept for after the build</span>' : `<button class="btn" data-act="keep_idea" data-id="${esc(it.id)}">Keep for later</button>`}<button class="btn" data-act="acknowledge" data-id="${esc(it.id)}">Drop</button></div>`);
   const closed = !open && !opts.ack && !opts.idea && it.status !== 'info';
   return `<article class="card${open ? ' needs' : ''}${closed ? ' closed' : ''}" data-card="${esc(it.id)}">${parts.join('')}</article>`;
@@ -1333,7 +1374,7 @@ async function sendMessage(agent, btn) {
 }
 
 function roleOf(a) {
-  for (const [prefix, r] of [['lead', 'lead'], ['architect', 'architect'], ['design', 'designer'], ['review', 'reviewer'], ['security', 'security'], ['sec', 'security'], ['qa', 'qa'], ['usertest', 'usertest'], ['user', 'usertest'], ['persona', 'usertest'], ['test', 'qa'], ['cleanup', 'cleanup'], ['clean', 'cleanup'], ['docs', 'docs'], ['codex', 'codex']]) if (a.startsWith(prefix)) return r;
+  for (const [prefix, r] of [['lead', 'lead'], ['architect', 'architect'], ['design', 'designer'], ['review', 'reviewer'], ['security', 'security'], ['sec', 'security'], ['qa', 'qa'], ['usertest', 'usertest'], ['user', 'usertest'], ['persona', 'usertest'], ['test', 'qa'], ['cleanup', 'cleanup'], ['clean', 'cleanup'], ['docs', 'docs'], ['codex', 'codex'], ['checker', 'checker'], ['check', 'checker']]) if (a.startsWith(prefix)) return r;
   return 'builder';
 }
 
@@ -1349,6 +1390,8 @@ document.getElementById('add-form').addEventListener('submit', async (e) => {
   const name = slug(document.getElementById('f-name').value);
   const brief = clean(document.getElementById('f-brief').value).trim();
   const repo = document.getElementById('f-repo').value.trim();
+  const kind = document.getElementById('f-kind').value;
+  const liveUrl = document.getElementById('f-live').value.trim();
   // Agent names are unique across projects: "lead" in project gym-app becomes "lead-gym-app".
   const agents = document.getElementById('f-agents').value.split(',').map((s) => slug(s)).filter(Boolean)
     .map((a) => (a.endsWith(`-${slug(document.getElementById('f-name').value)}`) ? a : `${a}-${slug(document.getElementById('f-name').value)}`));
@@ -1359,7 +1402,7 @@ document.getElementById('add-form').addEventListener('submit', async (e) => {
   btn.disabled = true;
   try {
     const now = new Date().toISOString();
-    await db.doc(`projects/${name}`).set({ name, goal: brief.split('\n')[0].replace(/^#+\s*/, '').slice(0, 160), brief, repo, phase: 'planning', priority: document.getElementById('f-priority').value,
+    await db.doc(`projects/${name}`).set({ name, goal: brief.split('\n')[0].replace(/^#+\s*/, '').slice(0, 160), brief, repo, kind, live_url: liveUrl, phase: 'planning', priority: document.getElementById('f-priority').value,
       scope: [], never: [], lead: agents.find((a) => role(a) === 'lead') || '', agents: agents.map((a) => ({ name: a, role: role(a) })), created_at: now });
     for (const a of agents) await db.doc(`agents/${a}`).set({ agent: a, project: name, role: role(a), registered_at: now, state: 'registered' });
     const out = document.getElementById('add-result');

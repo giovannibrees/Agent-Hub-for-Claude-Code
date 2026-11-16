@@ -25,6 +25,17 @@ every part of it.
 
 ## What's new
 
+- **Build a new app from one form:** pick what you are building (SaaS, web app, landing page,
+  internal tool) and the lead starts from a starter checklist, lists the accounts it needs, and
+  stops at four checkpoints for you. See [Build a new app](#build-a-new-app).
+- **Ship it:** one button on a delivery merges, deploys and checks the live site. See
+  [Ship it](#ship-it).
+- **Lean team:** one checker runs code review, security and Codex in one pass, and builders merge
+  their own checked work, so finished work no longer waits for the lead. See
+  [Pick a team](#pick-a-team).
+- **Instant wakes and a watchdog:** agents wake each other within a minute, and a watchdog wakes
+  any agent that missed its check. See [Keeping agents awake](#keeping-agents-awake).
+- **New look:** a cleaner, easier-to-read design in light and dark.
 - **Claude + Codex team:** OpenAI's Codex reviews every task as a second opinion. See
   [Claude leads, Codex reviews](#claude-leads-codex-reviews).
 - **Usage limits:** stopped agents show when their limit resets and resume at reset with one
@@ -235,16 +246,17 @@ restart. Answered cards in the feed say "Not picked up yet" until an agent reads
 
 | Team | Agents | Use it for |
 |---|---|---|
+| Lean (default) | lead, builder, checker | Most new apps: one checker runs code review, security and Codex in one pass |
 | Solo | lead, builder | Small fixes, landing pages, internal scripts. The lead reviews. |
-| Standard | lead, builder, reviewer, security | Most apps |
+| Standard | lead, builder, reviewer, security | Most apps, with separate reviewers |
 | Claude + Codex | lead, builder, reviewer, codex, security | Most apps, with a second opinion from OpenAI's Codex on every task |
 | Product | lead, designer, builder, builder-2, reviewer, qa | Apps with many screens |
 | Secure | lead, architect, builder, builder-2, reviewer, security, qa | Payments, personal data, real users, production |
 | Review | lead, builder, reviewer, security, cleanup, usertest | An existing app: code audit plus user tests |
 
 You can also type your own list. The name sets the role: names starting with `lead`, `architect`,
-`design`, `review`, `security`, `qa`, `usertest`, `cleanup`, `docs` or `codex` get that role, everything
-else is a builder. Start small and add a role when you miss it: bugs slipping through (add a
+`design`, `review`, `security`, `qa`, `usertest`, `cleanup`, `docs`, `codex` or `checker` get that role,
+everything else is a builder. Start small and add a role when you miss it: bugs slipping through (add a
 reviewer), anything with logins or money (add security), many screens (add a designer and QA).
 Seven agents per project is the useful maximum.
 
@@ -499,6 +511,33 @@ passes it on to its own agents where it applies.
 
 ![Message all leads](img/broadcast.png)
 
+### Build a new app
+
+In **Add project**, choose **What are you building?** and, if it already runs somewhere, the
+**Live URL**.
+
+- **SaaS, web app, landing page or internal tool:** the lead plans from a starter checklist for
+  that kind of app (for a SaaS: landing page with pricing, signup and login, the core feature,
+  test-mode billing, settings, email, privacy and terms, error tracking, deploys with a preview
+  link). Anything the brief rules out goes on the never-list on purpose.
+- **Accounts:** before building, the lead lists what it needs (GitHub repo, hosting, database,
+  payments, email, API keys) and asks once, saying where to add each one. Keys go into your cloud
+  environment's secrets, never into the hub.
+- **Four checkpoints for you**, shown in Progress: the plan, the design, the first preview link
+  to click through, and the delivery with Ship it. Nothing goes live and no money moves without
+  you.
+- **Live URL:** the lead first checks what really serves that address and writes down how a
+  change gets there. If the project's code cannot reach it, you hear it in the plan card, not at
+  the end.
+
+### Ship it
+
+A delivery for a project with a pull request or a live URL has a **Ship it** button (with Undo).
+The lead merges, deploys, then loads the live URL and confirms the change is really there. Only
+then does Progress show **Live on <your site>**. If the change does not show up within 15
+minutes, you get a high-priority card with the cause. Ship it approves that release, including the
+first one to real users; deleting data and turning on real payments still get their own card.
+
 ### Releases
 
 Each project card has **Release automatically when all checks pass** (on by default). When every
@@ -600,6 +639,14 @@ The full rules are in [cloud/PROTOCOL.md](../cloud/PROTOCOL.md). In short:
 - Only planned tasks. New ideas go to the ideas backlog.
 - A status at least every 2 hours. Deliver with proof, then stop. No invented work.
 - The 4-hour rule applies only to reversible decisions.
+
+### Keeping agents awake
+
+Each agent makes its own wake button (a scheduled task that only runs when pressed). Agents press
+each other's when they hand over work, so the next agent starts within a minute instead of at its
+next timed check. The **Agent Hub watchdog** scheduled task runs every hour and wakes any agent
+more than 15 minutes past its check. Set it up once by asking Claude Code: "Create the Agent Hub
+watchdog scheduled task from docs/MANUAL.md" (the prompt is in `docs/watchdog-prompt.md`).
 
 ### Keeping cost down
 
