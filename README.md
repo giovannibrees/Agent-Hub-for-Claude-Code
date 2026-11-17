@@ -387,9 +387,9 @@ Only you. The page is private on your claude.ai account. Use its Share menu to g
 Free for your own work, with a commercial license for everything else. This is not open source.
 
 - **Free:** copy Agent Hub into your own private repo, change it as you like (for example to fit a
-  sensitive in-house system), and run it for your own projects and your team.
-- **Commercial license:** using it for client work, reselling or redistributing it, publishing a
-  changed version publicly, offering it as a hosted or white-label service, or building a
-  competing product.
+  sensitive in-house system), and run it for your own projects, your team and your client work.
+- **Commercial license:** selling or giving the hub itself to clients or anyone else (including
+  setting it up in their accounts), redistributing it, publishing a changed version publicly,
+  offering it as a hosted or white-label service, or building a competing product.
 
 See [LICENSE](LICENSE). For a commercial license, [contact Giovanni Brees](https://github.com/giovannibrees) for a price.
