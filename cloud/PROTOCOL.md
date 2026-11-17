@@ -113,7 +113,7 @@ more than 15 minutes past its `next_check_at`.
   "verification": ["npm test: 48 passed"],
   "task": "T-1",
   "to_agent": "handover target",
-  "reply_to": "item id this follows up",
+  "reply_to": "item id this follows up or replaces (the hub then hides the old card)",
   "change": "minor | moderate | major (scope change approvals)"
 }
 ```

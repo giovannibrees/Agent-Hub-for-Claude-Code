@@ -308,6 +308,20 @@ test('A hub that already has a project hands a new one over as a new-hub request
   await ctx.close();
 });
 
+test('A card replaced by a newer version is hidden, but search still finds it', async () => {
+  const p = await open();
+  await p.evaluate(async () => { const db = await window.HUB_DEMO.use('db');
+    await db.doc('items/dv2').set({ id: 'dv2', timestamp: new Date().toISOString(), agent: 'designer-client-portal', project: 'client-portal', type: 'approval',
+      title: 'Client dashboard layout v2', status: 'open', needs_me: true, reply_to: 'i2', recommendation: 'Approve', reversible: true, bullets: ['Lighter look'] }); });
+  await p.waitForTimeout(400);
+  const page = await p.locator('main').textContent();
+  check(/Client dashboard layout v2/.test(page), 'new version not shown');
+  check(!/Client dashboard layout and colors/.test(page), 'replaced card still shown');
+  await p.fill('#search', 'layout and colors'); await p.waitForTimeout(400);
+  check(/Client dashboard layout and colors/.test(await p.locator('#feed').textContent()), 'search does not find the replaced card');
+  await p.done();
+});
+
 test('Brief helper writes the brief and names what is missing', async () => {
   const p = await open();
   await p.click('#add-toggle'); await p.click('#brief-help summary');

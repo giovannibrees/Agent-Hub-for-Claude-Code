@@ -124,14 +124,23 @@ function renderTabs() {
   const tab = (name, label, extra) => { const n = needN(name); return `<button type="button" class="ptab${curProject === name ? ' on' : ''}${extra || ''}" data-ptab="${esc(name)}" aria-pressed="${curProject === name}">${esc(label)}${n ? ` <span class="badge">${n}</span>` : ''}</button>`; };
   nav.innerHTML = tab('', 'All projects') + order.map((p) => tab(p.name, p.name, p.phase === 'complete' ? ' done' : '')).join('');
 }
+// A card that a newer card replies to (a new design after feedback, an answer to More info) is
+// replaced: it is hidden everywhere except search results.
+function replacedIds(items) {
+  const byId = new Set(items.map((i) => i.id));
+  return new Set(items.map((i) => i.reply_to).filter((id) => id && byId.has(id)));
+}
 function render() {
   pickProject();
   renderTabs();
-  if (!curProject) return renderView();
   const keep = { items: S.items, agents: S.agents, projects: S.projects, tasks: S.tasks, unread: S.unread, personas: S.personas };
-  const mine = (x) => (x.project || '') === curProject;
-  S.items = keep.items.filter(mine); S.agents = keep.agents.filter(mine); S.projects = keep.projects.filter((p) => p.name === curProject);
-  S.tasks = keep.tasks.filter(mine); S.unread = keep.unread.filter(mine); S.personas = keep.personas.filter(mine);
+  const replaced = clean(searchQ).trim() ? new Set() : replacedIds(keep.items);
+  S.items = keep.items.filter((i) => !replaced.has(i.id));
+  if (curProject) {
+    const mine = (x) => (x.project || '') === curProject;
+    S.items = S.items.filter(mine); S.agents = keep.agents.filter(mine); S.projects = keep.projects.filter((p) => p.name === curProject);
+    S.tasks = keep.tasks.filter(mine); S.unread = keep.unread.filter(mine); S.personas = keep.personas.filter(mine);
+  }
   try { renderView(); } finally { Object.assign(S, keep); }
 }
 function renderView() {
