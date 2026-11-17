@@ -29,6 +29,7 @@ function subscribe(path, key, query) {
   }
   checkPerms();
   initCloud();
+  checkSetup();
   try { assetsCap = await useCap('assets'); } catch (e) { assetsCap = null; }
   db.collection('projects').limit(1).get().then((q) => { if (q.empty) document.getElementById('add-panel').hidden = false; }).catch(() => {});
   subscribe('items', 'recentItems', (c) => c.orderBy('timestamp', 'desc').limit(300));

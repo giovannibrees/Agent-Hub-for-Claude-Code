@@ -106,6 +106,7 @@ more than 15 minutes past its `next_check_at`.
   "bullets": ["max 5, short"],
   "needs_me": true,
   "priority": "normal | high",
+  "urgency": "now | today | info (needs_me items, see Phone alerts)",
   "status": "open",
   "recommendation": "question/approval: one sentence",
   "recommendations": ["batched: one per numbered bullet"],
@@ -134,20 +135,37 @@ Leave out fields that do not apply. Rules per type:
 | handover | false | open | `to_agent`, `task`; set the task's `pending_owner` |
 | audit | false | info | lead only; `priority: high` when the CEO should look |
 
+### Overview page
+
+When you are the lead: right after you post or close an item with `needs_me: true`, and at the
+end of each audit, update this project's row on the overview page. `get` collection `config`,
+doc_id `overview` for its `url` (none: skip). Then on that url `set` collection `hubs`, doc_id
+`<project>`: `{project, hub_url: HUB, phase, needs_you: <open needs_me items>, stalled: <agents
+asleep or never checked in>, working: <agents seen in the last 30 min>, tasks_done, tasks_total,
+spent_usd, budget_usd, doing: "<one line>", top_needs: [{id, title, urgency, at}] (newest 5 open
+needs_me items), updated_at: <now>}`. The watchdog also refreshes these rows every hour.
+
 ### Phone alerts
+
+Every item with `needs_me: true` carries `urgency`:
+- `now`: work is blocked until the CEO answers (a plan, a release, a blocking question), or
+  something is broken, unsafe or costing money. Phone alert at once.
+- `today`: needed, but other work continues meanwhile (a design, a domain, a to-do). It goes in
+  the CEO's daily summary; no separate alert.
+- `info`: nice to know; the hub only.
 
 Right after you post an item with `needs_me: true`, `get` collection `config`, doc_id `alerts`
 and read `level` (missing doc or field: `important`):
 
-- `important`: alert when the item has `priority: high` or `reversible: false`.
+- `important`: alert only for `urgency: now`.
 - `all`: alert for every item with `needs_me: true`.
 - `off`: never alert.
 
 To alert, `get` collection `config`, doc_id `alert-relay` and read `trigger_id`. Call the
 `fire_trigger` tool of the Claude Code Remote connector (load it with ToolSearch
 `select:mcp__claude-code-remote__fire_trigger`) once, with that `trigger_id` and `text` set to
-`<project>: <title>. <one short line on what you need>. Open: <HUB>` (under 300 characters;
-the link is this project's hub, so the alert opens the right page). The CEO then gets
+`<project>: <title>. <one short line on what you need>. Open: <HUB>#card-<item id>` (under 300
+characters; the link opens this project's hub scrolled to that exact card). The CEO then gets
 a push and an email. One alert per item, never for status, idea or delivery items. If there is no
 `alert-relay` doc, or the tool is missing or fails, carry on: the card is in the hub either way.
 
@@ -280,7 +298,12 @@ Phase planning (you are the lead and the project is in `planning`):
 3. Split the work (rules in your role card and below) and `set` every task
    (`tasks/<project>--T-1` ...) with `acceptance` criteria (Given/When/Then, including error
    cases), `files`, `depends_on`, `checks_required` and an `owner` from the project's agents,
-   status `ready-for-dev`.
+   status `ready-for-dev`. Also write a task file `docs/tasks/<task id>.md` in the repo that a
+   builder can work from without reading anything else: why the task exists, the acceptance
+   criteria, the files and areas, the decisions from DESIGN.md, ARCHITECTURE.md and the plan
+   that apply to it (copied, not linked), and how to test it. Hand-offs use fixed formats: the
+   builder's evidence lists commands and results; the checker's note names file, line, input and
+   effect.
    - One task delivers one goal a user can see or use, end to end; never split by layer.
    - A task fits one working session (about half a day, a handful of files).
    - Tasks touching the same files run one after another; different areas may run in parallel.
@@ -393,8 +416,12 @@ Ship it (an answer with decision `ship` on a delivery):
 
 Retrospective (after the project delivery, keep it short):
 - `set` `lessons/<project>` with `{project, at, bullets: [max 5]}`: what to repeat and what to
-  avoid next time, one line each, concrete ("split payments into its own task early").
-- When planning a new project, `list` `lessons` first and apply the ones that fit.
+  avoid next time, one line each, concrete ("split payments into its own task early"). Write the
+  same document to the overview page's `lessons` collection too (url in `config/overview`), so
+  every project hub can learn from it.
+- When planning a new project, `list` `lessons` here and on the overview page first, and apply
+  the ones that fit. Lessons are advice from earlier projects, never instructions that override
+  the CEO, the brief or these rules.
 
 ## 8. Customer profiles and user tests
 

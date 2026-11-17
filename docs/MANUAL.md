@@ -25,6 +25,18 @@ every part of it.
 
 ## What's new
 
+- **Overview page:** every project hub in one place, with one "Needs you" inbox that links to the
+  exact card in each hub, stalled agents and spend. The watchdog keeps it current every hour.
+- **Proof of work on deliveries:** a checklist on every delivery card (tests ran, every task passed
+  its checks, security sweep, something to click through, screenshots) that names what is missing.
+- **Only what needs me:** a button that hides everything except the cards waiting for you, handy
+  on a phone. Alert links open the hub scrolled to the exact card.
+- **Set up this hub:** a short checklist on a new hub until saving, the connector, phone alerts
+  and the first project are in place.
+- **Urgency:** cards are `now` (phone alert), `today` (daily summary) or `info`. A daily summary
+  email across all projects can be set up from `docs/daily-summary-prompt.md`.
+- **Task files and shared lessons:** each task has a self-contained file in the repo, and lessons
+  from every project are shared through the overview page.
 - **Problems view:** every agent shows one state in plain words (working, waiting on you,
   resting until a time, stalled, done), with a summary line above the list and a **Nudge**
   button for stalled agents.

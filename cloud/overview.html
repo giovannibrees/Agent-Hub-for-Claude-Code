@@ -1,0 +1,125 @@
+<title>Agent Hubs</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: one overview across every project hub. A shared "Needs you" inbox first, then one card
+   per hub. Same tokens as the hub pages. */
+:root {
+  --bg: #f5f6f8; --surface: #ffffff; --sunk: #eef0f4; --ink: #0e1626; --muted: #3f4859; --line: #d5dae2;
+  --accent: #3355e0; --accent-tint: #e9eefd; --attn: #c2570b; --attn-tint: #fdf0e4; --ok: #138a55; --ok-tint: #e3f4eb;
+  --error: #c0262d; --shadow: 0 1px 2px rgba(14, 22, 38, .05), 0 6px 16px -6px rgba(14, 22, 38, .08);
+  --sans: "Geist", -apple-system, "Segoe UI", Roboto, sans-serif; --radius: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b0e14; --surface: #131823; --sunk: #0f131b; --ink: #f1f3f7; --muted: #b4bccb; --line: #2e3746;
+    --accent: #8099ff; --accent-tint: #1a2140; --attn: #f4a340; --attn-tint: #2b1f12; --ok: #4cc58c; --ok-tint: #12291f;
+    --error: #f38b7f; --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 20px -10px rgba(0, 0, 0, .5); color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0b0e14; --surface: #131823; --sunk: #0f131b; --ink: #f1f3f7; --muted: #b4bccb; --line: #2e3746;
+  --accent: #8099ff; --accent-tint: #1a2140; --attn: #f4a340; --attn-tint: #2b1f12; --ok: #4cc58c; --ok-tint: #12291f;
+  --error: #f38b7f; --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 20px -10px rgba(0, 0, 0, .5); color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 400 17px/1.6 var(--sans); -webkit-font-smoothing: antialiased; }
+.wrap { max-width: 1100px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 28px 56px; }
+h1 { font-size: 26px; letter-spacing: -.02em; margin: 0 0 4px; display: flex; gap: 10px; align-items: center; }
+h1::before { content: ""; width: 24px; height: 24px; border-radius: 7px; background: radial-gradient(circle, #fff 0 3px, transparent 3.5px), var(--accent); }
+h2 { font-size: 20px; margin: 32px 0 12px; display: flex; gap: 10px; align-items: center; }
+.sub { color: var(--muted); margin: 0; }
+.count { font: 500 14px/1 var(--sans); color: var(--muted); background: var(--sunk); border-radius: 999px; padding: 4px 9px; }
+.inbox, .hubs { display: grid; gap: 12px; }
+.hubs { grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow); min-width: 0; display: grid; gap: 8px; }
+.card.hot { border-color: color-mix(in srgb, var(--attn) 45%, var(--line)); }
+.card h3 { margin: 0; font-size: 19px; overflow-wrap: anywhere; }
+.row { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; color: var(--muted); font-size: 16px; }
+.chip { font: 600 13px/1 var(--sans); padding: 5px 9px; border-radius: 999px; background: var(--sunk); color: var(--muted); white-space: nowrap; }
+.chip.you { background: var(--attn-tint); color: var(--attn); }
+.chip.bad { background: var(--error); color: #fff; }
+.chip.ok { background: var(--ok-tint); color: var(--ok); }
+a { color: var(--accent); }
+.btn { display: inline-block; text-decoration: none; border: 1px solid var(--line); border-radius: 9px; padding: 8px 14px; color: var(--ink); background: var(--surface); font-weight: 500; }
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.item { display: grid; gap: 2px; padding: 12px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); min-width: 0; }
+.item a { font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
+.item a:hover { text-decoration: underline; }
+.empty { border: 1px dashed var(--line); border-radius: var(--radius); padding: 18px 20px; color: var(--muted); margin: 0; }
+.bar { height: 6px; border-radius: 3px; background: var(--sunk); overflow: hidden; }
+.bar span { display: block; height: 100%; background: var(--ok); }
+.bar.near span { background: var(--attn); } .bar.over span { background: var(--error); }
+.hint { color: var(--muted); font-size: 15px; }
+</style>
+
+<main class="wrap">
+  <h1>Agent Hubs</h1>
+  <p class="sub" id="status">Loading your projects...</p>
+
+  <h2>Needs you <span class="count" id="needs-count">0</span></h2>
+  <div class="inbox" id="inbox"><p class="empty">Nothing needs you right now.</p></div>
+
+  <h2>Projects <span class="count" id="hub-count">0</span></h2>
+  <div class="hubs" id="hubs"><p class="empty">No hubs yet. Each new project hub adds itself here.</p></div>
+  <p class="hint" id="note">Updated by each project's lead when it posts a card for you, and every hour by the watchdog.</p>
+</main>
+
+<script>
+'use strict';
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const ms = (t) => { const v = Date.parse(t || ''); return Number.isFinite(v) ? v : 0; };
+const ago = (t) => { const m = Math.round((Date.now() - ms(t)) / 60000); return !ms(t) ? 'never' : m < 1 ? 'just now' : m < 60 ? `${m}m ago` : m < 1440 ? `${Math.round(m / 60)}h ago` : `${Math.round(m / 1440)}d ago`; };
+// Only claude.ai hub links are followed; anything else is shown as text.
+const hubUrl = (u) => (/^https:\/\/claude\.ai\/(code\/)?artifact\/[A-Za-z0-9-]+$/.test(String(u || '')) ? String(u) : '');
+const cardId = (id) => (/^[A-Za-z0-9_-]+$/.test(String(id || '')) ? String(id) : '');
+function useCap(name) {
+  if (window.HUB_DEMO) return window.HUB_DEMO.use(name);
+  return window.claude && window.claude.use ? window.claude.use(name) : Promise.resolve(null);
+}
+let hubs = [];
+
+function render() {
+  const live = hubs.slice().sort((a, b) => (b.needs_you || 0) - (a.needs_you || 0) || (b.stalled || 0) - (a.stalled || 0) || ms(b.updated_at) - ms(a.updated_at));
+  document.getElementById('hub-count').textContent = live.length;
+  const needs = [];
+  for (const h of live) for (const n of (Array.isArray(h.top_needs) ? h.top_needs : [])) needs.push({ h, n });
+  document.getElementById('needs-count').textContent = live.reduce((s, h) => s + (Number(h.needs_you) || 0), 0);
+  document.title = needs.length ? `(${live.reduce((s, h) => s + (Number(h.needs_you) || 0), 0)}) Agent Hubs` : 'Agent Hubs';
+  document.getElementById('inbox').innerHTML = needs.length ? needs.map(({ h, n }) => {
+    const u = hubUrl(h.hub_url); const id = cardId(n.id);
+    const link = u ? `${u}${id ? `#card-${id}` : ''}` : '';
+    return `<div class="item">${link ? `<a href="${esc(link)}" target="_blank" rel="noopener">${esc(n.title)}</a>` : `<strong>${esc(n.title)}</strong>`}
+      <span class="row"><span>${esc(h.project)}</span>${n.urgency === 'now' ? '<span class="chip you">Urgent</span>' : ''}${n.at ? `<span>${esc(ago(n.at))}</span>` : ''}</span></div>`;
+  }).join('') : '<p class="empty">Nothing needs you right now.</p>';
+  document.getElementById('hubs').innerHTML = live.length ? live.map((h) => {
+    const u = hubUrl(h.hub_url);
+    const budget = Number(h.budget_usd) || 0; const spent = Number(h.spent_usd) || 0;
+    const pct = budget ? Math.min(100, Math.round((spent / budget) * 100)) : 0;
+    return `<article class="card${h.needs_you ? ' hot' : ''}">
+      <h3>${esc(h.project)}</h3>
+      <div class="row"><span class="chip">${esc(h.phase || 'planning')}</span>${h.needs_you ? `<span class="chip you">${esc(h.needs_you)} need${h.needs_you === 1 ? 's' : ''} you</span>` : '<span class="chip ok">nothing for you</span>'}${h.stalled ? `<span class="chip bad">${esc(h.stalled)} stalled</span>` : ''}</div>
+      <div class="row"><span>${esc(h.working || 0)} working</span><span>${esc(h.tasks_done || 0)} of ${esc(h.tasks_total || 0)} tasks done</span></div>
+      ${h.doing ? `<p class="hint" style="margin:0">${esc(h.doing)}</p>` : ''}
+      ${spent || budget ? `<div class="row"><span>$${spent.toFixed(2)}${budget ? ` of $${budget.toFixed(2)}` : ' spent'}</span></div>${budget ? `<div class="bar${pct >= 100 ? ' over' : pct >= 80 ? ' near' : ''}"><span style="width:${pct}%"></span></div>` : ''}` : ''}
+      <div class="row">${u ? `<a class="btn" href="${esc(u)}" target="_blank" rel="noopener">Open hub</a>` : ''}<span class="hint">updated ${esc(ago(h.updated_at))}</span></div>
+    </article>`;
+  }).join('') : '<p class="empty">No hubs yet. Each new project hub adds itself here.</p>';
+}
+
+(async () => {
+  const st = document.getElementById('status');
+  const db = await useCap('db');
+  if (!db) { st.textContent = 'Open this page on claude.ai while signed in to see your projects.'; return; }
+  const timer = setTimeout(() => { st.textContent = 'Still loading. Check that this page may use its database.'; }, 10000);
+  db.collection('hubs').onSnapshot((snap) => {
+    clearTimeout(timer);
+    hubs = snap.docs.map((d) => Object.assign({ id: d.id }, d.data()));
+    st.textContent = 'Every project hub in one place. Open a card to answer it in its hub.';
+    render();
+  }, () => { clearTimeout(timer); st.textContent = 'Could not load the hubs. Reload the page.'; });
+})();
+</script>

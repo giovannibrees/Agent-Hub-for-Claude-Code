@@ -416,6 +416,50 @@ test('New project saves its size', async () => {
   await p.done();
 });
 
+test('Delivery cards show proof of work', async () => {
+  const p = await open();
+  const c = card(p, 'Booking flow released', '#deliveries');
+  const text = await c.textContent();
+  check(/Proof of work/.test(text) && /Tests ran/.test(text) && /Security sweep/.test(text), `no proof block: ${text.slice(0, 200)}`);
+  check(/missing:/.test(text), 'missing items not named (demo delivery has no screenshot)');
+  await p.done();
+});
+
+test('An alert link opens the exact card; focus view shows only what needs you', async () => {
+  const ctx = await browser.newContext({ viewport: { width: 1300, height: 950 } });
+  const p = await ctx.newPage();
+  await p.goto(URL_ + '#card-i2'); await p.waitForFunction(() => document.querySelectorAll('#needs article').length > 0);
+  await p.waitForTimeout(500);
+  check(await p.locator('#card-i2').count() === 1, 'card has no id');
+  const inView = await p.evaluate(() => { const r = document.getElementById('card-i2').getBoundingClientRect(); return r.top >= 0 && r.top < innerHeight; });
+  check(inView, 'linked card not scrolled into view');
+  await p.click('#focus-toggle'); await p.waitForTimeout(200);
+  check(await p.locator('.rail').isHidden() && await p.locator('#needs-block').isVisible(), 'focus view did not hide the rest');
+  await p.click('#focus-toggle'); await p.waitForTimeout(200);
+  check(await p.locator('.rail').isVisible(), 'focus view did not switch back');
+  await ctx.close();
+});
+
+test('Overview page lists every hub with what needs the CEO, linking to the exact card', async () => {
+  const ov = readFileSync(join(root, 'cloud/overview.html'), 'utf8');
+  const html = `<meta name="viewport" content="width=device-width,initial-scale=1"><script>\n${readFileSync(join(root, 'demo/demo-db.js'), 'utf8')}</script>`
+    + `<script>window.HUB_DEMO.load({ hubs: [
+      { id: 'recipe-box', project: 'recipe-box', hub_url: 'https://claude.ai/artifact/AbC123', phase: 'building', needs_you: 2, stalled: 1, working: 2, tasks_done: 3, tasks_total: 7, spent_usd: 12, budget_usd: 50,
+        top_needs: [{ id: 'itm_1', title: 'Approve the design', urgency: 'now' }, { id: 'itm_2', title: 'Pick a domain' }], updated_at: new Date().toISOString() },
+      { id: 'notes', project: 'notes', hub_url: 'javascript:alert(1)', phase: 'complete', needs_you: 0, updated_at: new Date().toISOString() } ] });</script>` + ov;
+  writeFileSync(join(root, 'tests/.out/overview.html'), html);
+  const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 } });
+  const p = await ctx.newPage(); const errs = []; p.on('pageerror', (e) => errs.push(String(e)));
+  await p.goto(pathToFileURL(join(root, 'tests/.out/overview.html')).href); await p.waitForTimeout(500);
+  check((await p.locator('#needs-count').textContent()) === '2', 'wrong needs count');
+  const href = await p.locator('#inbox a').first().getAttribute('href');
+  check(href === 'https://claude.ai/artifact/AbC123#card-itm_1', `bad deep link ${href}`);
+  check(/1 stalled/.test(await p.locator('#hubs').textContent()), 'stalled not shown');
+  check(await p.locator('#hubs a[href^="javascript"]').count() === 0, 'unsafe hub link rendered');
+  check(!errs.length, errs.join(' | '));
+  await ctx.close();
+});
+
 test('Brief helper writes the brief and names what is missing', async () => {
   const p = await open();
   await p.click('#add-toggle'); await p.click('#brief-help summary');

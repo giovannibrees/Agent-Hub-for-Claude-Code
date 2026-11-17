@@ -36,6 +36,25 @@ function attachmentsHtml(it) {
   return out.join('');
 }
 
+// Proof of work: what a delivery shows before the CEO ships it. Each line is checked by the page.
+function proofHtml(it) {
+  const ver = arr(it.verification);
+  const tasks = S.tasks.filter((t) => t.project === it.project);
+  const passed = tasks.filter((t) => t.status === 'done' && arr(t.checks_required).every((k) => (t.checks || {})[k] && t.checks[k].result === 'pass'));
+  const shots = arr(it.attachments).filter((a) => a && a.kind === 'image');
+  const preview = it.preview_url || (it.pr && it.pr.url) || arr(it.links)[0];
+  const rows = [
+    [ver.some((v) => /test|e2e|playwright|vitest|jest/i.test(v)), 'Tests ran', ver.find((v) => /test|e2e|playwright|vitest|jest/i.test(v))],
+    [tasks.length > 0 && passed.length === tasks.length, 'Every task passed its checks', tasks.length ? `${passed.length} of ${tasks.length} tasks` : 'no tasks recorded'],
+    [ver.some((v) => /security|sweep|audit/i.test(v)), 'Security sweep', ver.find((v) => /security|sweep|audit/i.test(v))],
+    [!!preview, 'Something to click through', preview ? host(preview) : ''],
+    [shots.length > 0, 'Screenshots', shots.length ? `${shots.length} attached` : ''],
+  ];
+  const missing = rows.filter((r) => !r[0]).map((r) => r[1].toLowerCase());
+  return `<div class="proof"><p class="proof-title">Proof of work${missing.length ? ` <span class="chip soft">missing: ${esc(missing.join(', '))}</span>` : ' <span class="chip ok">complete</span>'}</p>
+    <ul>${rows.map(([ok, label, detail]) => `<li class="${ok ? 'yes' : 'no'}"><span class="mark" aria-hidden="true">${ok ? '✓' : '–'}</span><span>${esc(label)}${detail ? `<span class="hint"> · ${esc(detail)}</span>` : ''}</span></li>`).join('')}</ul></div>`;
+}
+
 function cardHtml(it, opts) {
   opts = opts || {};
   const meta = [TYPE_LABEL[it.type] || it.type, it.agent, it.project, ago(it.timestamp)];
@@ -50,6 +69,7 @@ function cardHtml(it, opts) {
   const gh = githubHtml(it);
   if (gh) parts.push(`<p class="gh-line">${gh}</p>`);
   if (arr(it.verification).length) parts.push(`<ul class="evidence">${arr(it.verification).map((v) => `<li>${esc(v)}</li>`).join('')}</ul>`);
+  if (it.type === 'delivery' && it.status === 'open') parts.push(proofHtml(it));
   parts.push(attachmentsHtml(it));
   const open = it.needs_me && it.status === 'open';
   const batched = arr(it.recommendations).length > 1;
@@ -96,7 +116,7 @@ function cardHtml(it, opts) {
   else if (opts.ack) parts.push(`<div class="actions">${shippable ? `<button class="btn primary" data-act="ship" data-id="${esc(it.id)}">Ship it</button>` : ''}<button class="btn${shippable ? '' : ' primary'}" data-act="acknowledge" data-id="${esc(it.id)}">Acknowledge</button></div>${shippable && proj.live_url ? `<p class="hint">Ship it merges, deploys and checks ${esc(host(proj.live_url))} shows the change.</p>` : ''}`);
   if (opts.idea) parts.push(`<div class="actions">${it.status === 'kept' ? '<span class="count">Kept for after the build</span>' : `<button class="btn" data-act="keep_idea" data-id="${esc(it.id)}">Keep for later</button>`}<button class="btn" data-act="acknowledge" data-id="${esc(it.id)}">Drop</button></div>`);
   const closed = !open && !opts.ack && !opts.idea && it.status !== 'info';
-  return `<article class="card${open ? ' needs' : ''}${closed ? ' closed' : ''}" data-card="${esc(it.id)}">${parts.join('')}</article>`;
+  return `<article class="card${open ? ' needs' : ''}${closed ? ' closed' : ''}" id="card-${esc(it.id)}" data-card="${esc(it.id)}">${parts.join('')}</article>`;
 }
 
 function section(id, list, empty, opts) {
@@ -136,7 +156,54 @@ function replacedIds(items) {
     return NEW_VERSION.includes(i.type) || !(old.needs_me && old.status === 'open');
   }).map((i) => i.reply_to));
 }
+// Alerts link to <hub>#card-<id>: scroll to that card once it is on the page and highlight it.
+let linkedCard = (location.hash || '').replace(/^#/, '');
+window.addEventListener('hashchange', () => { linkedCard = (location.hash || '').replace(/^#/, ''); render(); });
+function showLinkedCard() {
+  if (!/^card-/.test(linkedCard)) return;
+  const el = document.getElementById(linkedCard);
+  if (!el) return;
+  linkedCard = '';
+  el.classList.add('flash');
+  el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  setTimeout(() => el.classList.remove('flash'), 2600);
+}
+let focusMode = false;
+try { focusMode = localStorage.getItem('hub-focus') === '1'; } catch (e) { /* storage blocked */ }
+function applyFocus() {
+  document.body.classList.toggle('focus', focusMode);
+  const b = document.getElementById('focus-toggle');
+  if (b) { b.textContent = focusMode ? 'Show everything' : 'Only what needs me'; b.setAttribute('aria-pressed', String(focusMode)); }
+}
+
+// First-run checklist: what this hub needs before agents can work. Hidden once done or dismissed.
+let setupState = { relay: null };
+let setupHidden = false;
+try { setupHidden = localStorage.getItem('hub-setup-hidden') === '1'; } catch (e) { /* storage blocked */ }
+async function checkSetup() {
+  if (!db || window.HUB_DEMO) return;
+  try { const r = await db.doc('config/alert-relay').get(); setupState.relay = r.exists; } catch (e) { setupState.relay = false; }
+  render();
+}
+function renderSetup() {
+  const el = document.getElementById('setup');
+  if (!el) return;
+  const steps = [
+    [!!db && document.getElementById('perm').hidden, 'Allow saving', 'Open this page on claude.ai while signed in and allow its database when asked, so your answers are saved.'],
+    [!!mcp, 'Allow the Claude Code Remote connector', 'Allow it when the page asks (or in the page\'s Permissions menu). It lets the page start agents, read their costs and wake them when you answer.'],
+    [setupState.relay === true, 'Phone alerts', 'Ask Claude Code: "Create the Agent Hub alert relay from docs/MANUAL.md" so cards that need you reach your phone and email.'],
+    [S.projects.length > 0, 'Add your first project', 'Press Add project, describe what you want built, and start the agents.'],
+  ];
+  const left = steps.filter((s) => !s[0]).length;
+  el.hidden = window.HUB_DEMO || setupHidden || left === 0 || setupState.relay === null;
+  if (el.hidden) return;
+  document.getElementById('setup-list').innerHTML = steps.map(([ok, title, how]) => `<li class="${ok ? 'done' : 'todo'}"><span class="mark" aria-hidden="true">${ok ? '✓' : ''}</span><span><strong>${esc(title)}</strong>${ok ? '' : `<br><span class="hint">${esc(how)}</span>`}</span></li>`).join('');
+}
+
 function render() {
+  renderSetup();
+  applyFocus();
+  setTimeout(showLinkedCard, 0);
   pickProject();
   renderTabs();
   const keep = { items: S.items, agents: S.agents, projects: S.projects, tasks: S.tasks, unread: S.unread, personas: S.personas };

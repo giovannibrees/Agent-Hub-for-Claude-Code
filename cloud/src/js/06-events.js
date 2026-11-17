@@ -129,6 +129,8 @@ document.addEventListener('click', async (e) => {
   }
   if (t.dataset.ptab !== undefined) { curProject = t.dataset.ptab; saveProjectChoice(curProject); render(); return; }
   if (t.dataset.nudge) { const n = t.dataset.nudge; nudged[n] = true; render(); await wakeAgent(n); return; }
+  if (t.id === 'setup-hide') { setupHidden = true; try { localStorage.setItem('hub-setup-hidden', '1'); } catch (x) { /* not kept */ } render(); return; }
+  if (t.id === 'focus-toggle') { focusMode = !focusMode; try { localStorage.setItem('hub-focus', focusMode ? '1' : '0'); } catch (x) { /* not kept */ } render(); return; }
   if (t.id === 'flt-clear') { filters = { agent: '', project: '', type: '' }; saveFilters(); render(); return; }
   if (t.id === 'add-another') { document.getElementById('add-result').hidden = true; const f = document.getElementById('add-form'); f.reset(); f.hidden = false; return; }
   if (t.id === 'prune' && db) {

@@ -79,7 +79,8 @@ How it looks and how it behaves. Recommended model: a mid-tier model is enough.
 
 Implements tasks. Recommended model: a mid-tier model (strongest for very hard tasks).
 
-- One task at a time, in dependency order. Only touch the files and areas the task names.
+- One task at a time, in dependency order. Start from the task file `docs/tasks/<task id>.md`;
+  it holds everything the task needs. Only touch the files and areas the task names.
   Need another area? Ask the lead first.
 - Test first where possible: write the failing test, make it pass, clean up.
 - In a team without a designer, the first UI task is the design: screens as screenshots and a

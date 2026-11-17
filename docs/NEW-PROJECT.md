@@ -21,9 +21,11 @@ gives you a request to paste into Claude Code. Claude then follows the steps bel
 6. Start the agents, lead first, with `create_session` (the start line from the page's
    `startLine`, with the new hub URL), then write each `session_id` and `started_at` to its agents
    doc. If the page is blocked from starting sessions, this step is how agents start.
-7. Add the new hub's URL to the "Agent Hub watchdog" scheduled task's list of hubs
-   (update_trigger with the full prompt from docs/watchdog-prompt.md and every hub URL), so the
-   watchdog also wakes this project's agents.
+7. Connect it to the overview page: in the new hub `set` `config/overview` with
+   `{"url": "<overview page url>", "hub_url": "<new hub url>"}` (copy the overview url from the
+   hub named in the request), and on the overview page `set` `hubs/<project>` with
+   `{project, hub_url, phase: "planning", needs_you: 0, updated_at}`. The watchdog reads the
+   overview's hub list every hour, so it now wakes this project's agents too.
 8. Reply with the new hub link. The CEO opens it once and allows the database and the Claude Code
    Remote connector.
 

@@ -266,6 +266,31 @@ textarea { width: 100%; resize: vertical; line-height: 1.5; }
 .team-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .team-actions .btn { padding: 6px 12px; font-size: 15px; }
 
+/* Proof of work on delivery cards */
+.proof { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 10px 14px; background: var(--surface); }
+.proof-title { margin: 0 0 6px; font-weight: 600; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.proof ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 4px; }
+.proof li { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 6px; }
+.proof .yes .mark { color: var(--ok); font-weight: 700; }
+.proof .no { color: var(--muted); }
+.chip.ok { background: var(--ok-tint); border-color: transparent; color: var(--ok); }
+
+/* Card linked from an alert */
+.card.flash { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 45%, transparent), var(--shadow); transition: box-shadow .3s; }
+
+/* Focus view: only what needs the CEO (handy on a phone) */
+body.focus .rail, body.focus .strip, body.focus #progress-block, body.focus #digest-block,
+body.focus #flags-block, body.focus #ideas-block, body.focus .block:has(#feed), body.focus #ptabs { display: none !important; }
+body.focus .board { grid-template-columns: minmax(0, 1fr); }
+#focus-toggle[aria-pressed="true"] { background: var(--accent-tint); border-color: var(--accent); color: var(--accent); }
+
+/* First-run checklist */
+.setup-list { list-style: none; padding: 0; margin: 12px 0 0; display: grid; gap: 10px; }
+.setup-list li { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 8px; }
+.setup-list .mark { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--line); display: grid; place-items: center; font-size: 12px; }
+.setup-list .done .mark { background: var(--ok-tint); color: var(--ok); border-color: transparent; }
+.setup-list .done strong { color: var(--muted); font-weight: 500; }
+
 /* Problems view: one state per agent */
 .st-summary { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
 .st-summary:empty { display: none; }
@@ -320,6 +345,7 @@ textarea { width: 100%; resize: vertical; line-height: 1.5; }
   .rail { position: static; }
 }
 @media (max-width: 600px) {
+  .actions .btn, .undo .btn { min-height: 44px; }
   .top { position: static; }
   .top-row { flex-wrap: wrap; row-gap: 10px; }
   .top-actions { width: 100%; }
@@ -332,6 +358,8 @@ textarea { width: 100%; resize: vertical; line-height: 1.5; }
   .filters select { min-width: 0; flex: 1 1 45%; }
 }
 @media (max-width: 400px) {
+  .top-actions { flex-direction: column; }
+  .top-actions .btn { width: 100%; }
   .project, .card { padding: 14px 12px; }
   .tile { padding: 12px; }
   .tile span { font-size: 16px; }
