@@ -195,7 +195,7 @@ const DATA = {
 
 // Sessions and a budget, so cost per project shows in the demo.
 const SESS = { 'lead-gym-app': 'session_demo_lead', 'builder-gym-app': 'session_demo_b1', 'builder-2-gym-app': 'session_demo_b2', 'reviewer-gym-app': 'session_demo_rev' };
-DATA.agents.forEach((a) => { if (SESS[a.agent]) { a.session_id = SESS[a.agent]; a.wake_trigger_id = `trig_wake_${a.agent}`; } });
+DATA.agents.forEach((a) => { if (SESS[a.agent]) { a.session_id = SESS[a.agent]; } });
 DATA.projects.forEach((p) => { if (p.name === 'gym-app') p.budget_usd = 75; });
 // Auto-build: project types, a live URL with Ship it, and a project built by the Lean team.
 DATA.items.push({ id: 'i30', timestamp: iso(60 * 30), agent: 'lead-gym-app', project: 'gym-app', type: 'approval', title: 'Design for gym-app', priority: 'normal', status: 'answered', needs_me: false,
@@ -1576,14 +1576,17 @@ async function write(fn) {
   }
 }
 
-// Presses the agent's wake button (a scheduled task bound to its session) so it reads new work
-// within a minute instead of at its next timed check. Best effort: the next check picks it up anyway.
-let wakeOn = false;
+// Wakes the agent's own session with a one-off scheduled message a minute from now, so it reads new
+// work right away instead of at its next timed check. (Firing a scheduled task would start a new,
+// empty session instead.) Best effort: the agent's next check picks the work up anyway.
 async function wakeAgent(name) {
   const a = S.agents.find((x) => x.agent === name);
-  if (!wakeOn || !mcp || !a || !a.wake_trigger_id) return;
-  try { await mcp.callTool(CC, 'fire_trigger', { trigger_id: a.wake_trigger_id, text: 'Agent Hub: the CEO answered or sent you work. Run your next loop iteration now.' }); }
-  catch (e) { /* the agent's own next check reads it */ }
+  if (!triggerOn || !mcp || !a || !a.session_id) return;
+  try {
+    await mcp.callTool(CC, 'create_trigger', { name: `Wake ${a.agent}`, persistent_session_id: a.session_id, initiation: 'human_request',
+      run_once_at: new Date(Date.now() + 60000).toISOString().replace(/\.\d{3}Z$/, 'Z'),
+      prompt: 'Agent Hub: the CEO answered or sent you work. Run your next loop iteration now.' });
+  } catch (e) { /* the agent's own next check reads it */ }
 }
 
 async function act(id, action, text) {
@@ -1630,7 +1633,6 @@ async function initCloud() {
     if (srv && (srv.tools || []).some((t) => t.name === 'create_session')) {
       mcp = m; render();
       triggerOn = (srv.tools || []).some((t) => t.name === 'create_trigger');
-      wakeOn = (srv.tools || []).some((t) => t.name === 'fire_trigger');
       if ((srv.tools || []).some((t) => t.name === 'get_session')) { costsOn = true; refreshCosts(); setInterval(refreshCosts, 10 * 60000); }
     }
   } catch (e) { mcp = null; }

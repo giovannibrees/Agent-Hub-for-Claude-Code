@@ -235,12 +235,13 @@ test('A rejected design checkpoint does not show as approved', async () => {
   await p.done();
 });
 
-test('Answering a card presses the agent\'s wake button', async () => {
+test('Answering a card wakes the agent\'s own session', async () => {
   const p = await open();
   await card(p, 'Payments before').locator('[data-act=approve]').click();
   await p.waitForTimeout(900);
-  const wakes = (await p.evaluate(() => window.HUB_CALLS)).filter((c) => c[0] === 'fire_trigger');
-  check(wakes.length === 1 && wakes[0][1].trigger_id === 'trig_wake_lead-gym-app', `bad wakes ${JSON.stringify(wakes)}`);
+  const wakes = (await p.evaluate(() => window.HUB_CALLS)).filter((c) => c[0] === 'create_trigger' && /^Wake /.test(c[1].name));
+  check(wakes.length === 1 && wakes[0][1].persistent_session_id === 'session_demo_lead' && wakes[0][1].run_once_at, `bad wakes ${JSON.stringify(wakes)}`);
+  check(!(await p.evaluate(() => window.HUB_CALLS)).some((c) => c[0] === 'fire_trigger'), 'fire_trigger used to wake');
   await p.done();
 });
 

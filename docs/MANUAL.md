@@ -38,8 +38,8 @@ every part of it.
 - **Lean team:** one checker runs code review, security and Codex in one pass, and builders merge
   their own checked work, so finished work no longer waits for the lead. See
   [Pick a team](#pick-a-team).
-- **Instant wakes and a watchdog:** agents wake each other within a minute, and a watchdog wakes
-  any agent that missed its check. See [Keeping agents awake](#keeping-agents-awake).
+- **Faster wakes and a watchdog:** agents and your answers wake the next agent in about a minute,
+  and a watchdog wakes any agent that missed its check. See [Keeping agents awake](#keeping-agents-awake).
 - **New look:** a cleaner, easier-to-read design in light and dark.
 - **Claude + Codex team:** OpenAI's Codex reviews every task as a second opinion. See
   [Claude leads, Codex reviews](#claude-leads-codex-reviews).
@@ -644,12 +644,11 @@ The full rules are in [cloud/PROTOCOL.md](../cloud/PROTOCOL.md). In short:
 
 ### Keeping agents awake
 
-Each agent makes its own wake button (a scheduled task that only runs when pressed). Agents press
-each other's when they hand over work, so the next agent starts within a minute instead of at its
-next timed check. The **Agent Hub watchdog** scheduled task runs every hour and wakes any agent
-more than 15 minutes past its check. Set it up once by asking Claude Code: "Create the Agent Hub
-watchdog scheduled task from docs/watchdog-prompt.md". The page also presses an agent's wake
-button when you answer a card or send it a message.
+When an agent hands work to another, and when you answer a card or send a message, the next agent
+gets a one-off wake-up in its own session about a minute later, instead of waiting for its timed
+check. The **Agent Hub watchdog** scheduled task runs every hour and wakes any agent more than 15
+minutes past its check. Set it up once by asking Claude Code: "Create the Agent Hub watchdog
+scheduled task from docs/watchdog-prompt.md".
 
 ### Keeping cost down
 

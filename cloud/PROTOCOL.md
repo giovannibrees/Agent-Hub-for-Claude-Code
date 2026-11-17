@@ -73,28 +73,19 @@ Each check is one iteration. Do not rely on `/loop`: it is not available in ever
    update or a second one). The hub shows an agent whose `next_check_at` passed more than 10
    minutes ago as asleep.
 
-### Your wake button
-
-On your first check in a session, if your agents doc has no `wake_trigger_id`, make one: call the
-`create_trigger` tool of the Claude Code Remote connector (ToolSearch
-`select:mcp__claude-code-remote__create_trigger`) with name "Wake <you>", the prompt "Agent Hub:
-you have new work. Run your next loop iteration now.", `initiation: "own_followup"`, and no
-`cron_expression`, `run_once_at`, `persistent_session_id` or `create_new_session_on_fire`. That
-makes a wake task bound to your own session that only fires when someone presses it. Write its id
-to your agents doc as `wake_trigger_id`.
-
 ### Wake the agent you hand work to
 
 Whenever you give another agent work (a directive, a task moved to `review` for its checkers,
 a failed check back to the builder, a handover, a task whose checks all passed), wake that agent
-at once instead of waiting for its next check: read its agents doc and call the `fire_trigger`
-tool (ToolSearch `select:mcp__claude-code-remote__fire_trigger`) with its `wake_trigger_id`. This
-runs within a minute; scheduled one-off tasks can start 30 minutes late or more. No
-`wake_trigger_id` but a `session_id`: fall back to `create_trigger` with `persistent_session_id`
-set to that `session_id`, `run_once_at` one minute from now, `initiation: "own_followup"`, name
-"Wake <agent>" and the same prompt. Neither: the agent picks the work up on its own next check.
-The hub's watchdog also presses the wake button of any agent that is more than 15 minutes past its
-`next_check_at`.
+at once instead of waiting for its next check: read its agents doc and, if it has a
+`session_id`, call the `create_trigger` tool of the Claude Code Remote connector (ToolSearch
+`select:mcp__claude-code-remote__create_trigger`) with `persistent_session_id` set to that
+`session_id`, `run_once_at` one minute from now, `initiation: "own_followup"`, name
+"Wake <agent>", and the prompt "Agent Hub: you have new work. Run your next loop iteration now."
+An agent without a `session_id` picks the work up on its own next check. Never use
+`fire_trigger` to wake an agent: firing a task starts a new, empty session instead of waking the
+agent's own. Do not create standing "wake" tasks. The hub's watchdog also wakes any agent that is
+more than 15 minutes past its `next_check_at`.
 
 ## 3. Posting items
 
