@@ -21,7 +21,9 @@ gives you a request to paste into Claude Code. Claude then follows the steps bel
 6. Start the agents, lead first, with `create_session` (the start line from the page's
    `startLine`, with the new hub URL), then write each `session_id` and `started_at` to its agents
    doc. If the page is blocked from starting sessions, this step is how agents start.
-7. Reply with the new hub link. The CEO opens it once and allows the database and the Claude Code
+7. Add the new hub's URL to the "Agent Hub watchdog" scheduled task's list of hubs
+   (update_trigger with the full prompt from docs/watchdog-prompt.md and every hub URL), so the
+   watchdog also wakes this project's agents.
+8. Reply with the new hub link. The CEO opens it once and allows the database and the Claude Code
    Remote connector.
 
-The watchdog checks one hub. With several active hubs, give it one line per hub URL.

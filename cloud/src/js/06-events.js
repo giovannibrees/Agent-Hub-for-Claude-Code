@@ -137,8 +137,16 @@ document.addEventListener('change', (e) => {
     const name = e.target.dataset.budget;
     const v = e.target.value.trim() === '' ? 0 : Number(e.target.value);
     if (!Number.isFinite(v) || v < 0) return;
+    const p = S.projects.find((x) => x.name === name) || {};
     db.doc(`projects/${name}`).update({ budget_usd: Math.round(v * 100) / 100 })
-      .then(() => { delete budgetDrafts[name]; render(); })
+      .then(async () => {
+        delete budgetDrafts[name]; render();
+        // A paused project restarts only when its lead hears about the new budget.
+        if (p.budget_paused && v > Number(p.spent_usd || 0) && p.lead) {
+          try { await db.collection('directives').add({ to: p.lead, project: name, from: 'ceo', via: 'page', text: `Budget raised to $${v.toFixed(2)}. Clear budget_paused and budget_warned and restart the agents that stopped for the budget.`, timestamp: new Date().toISOString(), read: false }); } catch (x) { /* the lead sees budget_usd on its next check */ }
+          wakeAgent(p.lead);
+        }
+      })
       .catch((x) => projectMsg(name, saveMessage(x)));
     return;
   }
@@ -184,7 +192,7 @@ document.getElementById('bc-form').addEventListener('submit', async (e) => {
   const bid = `bc_${Date.now().toString(36)}`;
   let sent = 0;
   for (const l of leads) {
-    try { await db.collection('directives').add({ to: l.agent, project: l.project || '', from: 'ceo', text, broadcast: bid, timestamp: new Date().toISOString(), read: false }); sent++; wakeAgent(l.agent); } catch (x) { break; }
+    try { await db.collection('directives').add({ to: l.agent, project: l.project || '', from: 'ceo', via: 'page', text, broadcast: bid, timestamp: new Date().toISOString(), read: false }); sent++; wakeAgent(l.agent); } catch (x) { break; }
   }
   btn.disabled = false;
   st.textContent = sent === leads.length ? `Sent to ${sent} lead${sent === 1 ? '' : 's'}: ${leads.map((l) => l.agent).join(', ')}.` : `Sent to ${sent} of ${leads.length} leads. Try again for the rest.`;

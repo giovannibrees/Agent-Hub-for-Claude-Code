@@ -336,6 +336,51 @@ test('A delivery that needs the CEO offers Ship it instead of Approve', async ()
   await p.done();
 });
 
+test('A sleeping agent is not offered Start again', async () => {
+  const p = await open();
+  await p.evaluate(async () => { const db = await window.HUB_DEMO.use('db');
+    await db.doc('agents/reviewer-gym-app').update({ last_seen: new Date(Date.now() - 50 * 60000).toISOString(),
+      next_check_at: new Date(Date.now() + 10 * 60000).toISOString(), state: 'working' }); });
+  await p.waitForTimeout(400);
+  const row = p.locator('#agents .agent', { hasText: 'reviewer-gym-app' });
+  check(await row.locator('[data-start]').count() === 0, 'Start again offered for a sleeping agent');
+  await p.done();
+});
+
+test('A status reply does not hide an open question', async () => {
+  const p = await open();
+  await p.evaluate(async () => { const db = await window.HUB_DEMO.use('db');
+    await db.doc('items/st1').set({ id: 'st1', timestamp: new Date().toISOString(), agent: 'lead-gym-app', project: 'gym-app', type: 'status',
+      title: 'Working on it', status: 'info', needs_me: false, reply_to: 'i1', bullets: ['x'] }); });
+  await p.waitForTimeout(400);
+  check(await card(p, 'Payments before').count() === 1, 'open question hidden by a status reply');
+  await p.done();
+});
+
+test('The tab keeps the hub title and answers are marked as from the page', async () => {
+  const p = await open({ undoMs: 100 });
+  check(/Agent Hub$/.test(await p.title()), `bad title ${await p.title()}`);
+  await card(p, 'Payments before').locator('[data-act=approve]').click();
+  await p.waitForTimeout(700);
+  const a = await dbGet(p, 'answers/i1');
+  check(a && a.via === 'page', `answer not marked ${JSON.stringify(a)}`);
+  await p.done();
+});
+
+test('Raising the budget of a paused project wakes the lead', async () => {
+  const p = await open();
+  await p.evaluate(async () => { const db = await window.HUB_DEMO.use('db');
+    await db.doc('projects/gym-app').update({ budget_paused: true, spent_usd: 75 }); });
+  await p.waitForTimeout(400);
+  await p.fill('#budget-gym-app', '150'); await p.locator('#budget-gym-app').dispatchEvent('change');
+  await p.waitForTimeout(800);
+  const dirs = await p.evaluate(async () => (await (await window.HUB_DEMO.use('db')).collection('directives').where('to', '==', 'lead-gym-app').get()).docs.map((d) => d.data()));
+  check(dirs.some((d) => /Budget raised to \$150/.test(d.text) && d.via === 'page'), `no budget directive ${JSON.stringify(dirs)}`);
+  const wakes = (await p.evaluate(() => window.HUB_CALLS)).filter((c) => c[0] === 'create_trigger' && c[1].persistent_session_id === 'session_demo_lead');
+  check(wakes.length >= 1, 'lead not woken');
+  await p.done();
+});
+
 test('Brief helper writes the brief and names what is missing', async () => {
   const p = await open();
   await p.click('#add-toggle'); await p.click('#brief-help summary');

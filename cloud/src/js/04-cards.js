@@ -127,8 +127,14 @@ function renderTabs() {
 // A card that a newer card replies to (a new design after feedback, an answer to More info) is
 // replaced: it is hidden everywhere except search results.
 function replacedIds(items) {
-  const byId = new Set(items.map((i) => i.id));
-  return new Set(items.map((i) => i.reply_to).filter((id) => id && byId.has(id)));
+  const byId = new Map(items.map((i) => [i.id, i]));
+  const NEW_VERSION = ['approval', 'question', 'delivery'];
+  return new Set(items.filter((i) => i.reply_to && byId.has(i.reply_to)).filter((i) => {
+    const old = byId.get(i.reply_to);
+    // A new card of the same kind replaces the old one. Any other reply (a status) only hides
+    // the old card once it is closed, so an open question never disappears.
+    return NEW_VERSION.includes(i.type) || !(old.needs_me && old.status === 'open');
+  }).map((i) => i.reply_to));
 }
 function render() {
   pickProject();
@@ -177,7 +183,7 @@ function renderView() {
   document.getElementById('t-running-label').textContent = S.agents.length ? `of ${S.agents.length} agents running` : 'Agents running';
   document.getElementById('t-deliveries').textContent = S.items.filter((i) => i.type === 'delivery' && i.status === 'open').length;
   document.getElementById('t-ideas').textContent = S.items.filter((i) => i.type === 'idea' && ['parked', 'kept'].includes(i.status)).length;
-  document.title = all ? `(${all}) Agent Hub` : 'Agent Hub';
+  document.title = all ? `(${all}) ${BASE_TITLE}` : BASE_TITLE;
 
   section('needs', needs, snoozedList.length ? 'Nothing needs you right now, apart from snoozed cards.' : 'Nothing needs you right now.');
   document.getElementById('snoozed-wrap').hidden = !snoozedList.length;

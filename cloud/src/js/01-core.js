@@ -2,6 +2,8 @@
 // Filled in at publish time so start lines can point agents at this page.
 const HUB_URL = 'HUB_URL_PLACEHOLDER';
 const STALE_MIN = 30;
+// Each hub has its own title ("Recipe Box Hub"); the tab shows it with the count of open cards.
+const BASE_TITLE = (document.title || 'Agent Hub').replace(/^\(\d+\)\s*/, '');
 const TYPE_LABEL = { status: 'Status', question: 'Question', approval: 'Approval', delivery: 'Delivery', idea: 'Idea', handover: 'Handover', audit: 'Audit' };
 const DECISION_LABEL = { approve: 'Approved', feedback: 'Feedback', more_info: 'Asked for more info', reject: 'Not approved', auto: 'Auto-proceeded (no answer in 4h)', ship: 'Ship it' };
 const MEANING = {

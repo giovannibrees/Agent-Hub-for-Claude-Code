@@ -1,6 +1,12 @@
 // ---------- rendering ----------
 
-function isRunning(a) { return Date.now() - ms(a.last_seen) < STALE_MIN * 60000; }
+// Running: seen in the last 30 minutes, or asleep on purpose until a check that is not overdue yet.
+// Delivered and stopped agents are not running.
+function isRunning(a) {
+  if (a.state === 'stopped') return false;
+  if (Date.now() - ms(a.last_seen) < STALE_MIN * 60000) return true;
+  return a.state !== 'delivered' && !!a.next_check_at && ms(a.next_check_at) + 10 * 60000 > Date.now();
+}
 
 // ---------- one-click start: cloud sessions through the Claude Code connector ----------
 const CC = 'Claude Code Remote';
@@ -61,14 +67,14 @@ function markStartBlocked() { startBlocked = true; try { localStorage.setItem('h
 // One message that starts every stopped agent of a project, for a Claude Code session to run.
 function startRequest(project) {
   const p = S.projects.find((x) => x.name === project) || {};
-  const list = S.agents.filter((a) => a.project === project && !isRunning(a))
+  const list = S.agents.filter((a) => a.project === project && !isRunning(a) && a.state !== 'delivered')
     .sort((x, y) => (roleOf(y.agent) === 'lead') - (roleOf(x.agent) === 'lead'));
   const src = githubRepo(p.repo);
   return [`Start the Agent Hub agents of project "${project}". For each agent below, in this order, create a Claude Code cloud session with the create_session tool of the Claude Code Remote connector: permission_mode "auto", title "<agent> (Agent Hub)"${src ? `, source_url "${src}"` : ''}, and the agent's start line as the prompt.`,
     `After each start, record it in the hub with the ArtifactData tool: action "update", url ${HUB_URL}, collection "agents", doc_id the agent's name, data {"session_id": <id>, "session_url": "https://claude.ai/code/<id>", "started_at": <now>, "state": "started"}. Then reply with one line per agent and stop.`, '',
     ...list.map((a, i) => `${i + 1}. ${a.agent}\nStart line: ${startLine(a.agent, a.role || roleOf(a.agent), project, p.repo || '')}`)].join('\n');
 }
-function stoppedCount(project) { return S.agents.filter((a) => a.project === project && !isRunning(a)).length; }
+function stoppedCount(project) { return S.agents.filter((a) => a.project === project && !isRunning(a) && a.state !== 'delivered').length; }
 
 // Agents write next_check_at when they schedule their next check. One that missed it by more
 // than 10 minutes has most likely been shut down while idle.

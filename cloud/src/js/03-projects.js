@@ -35,7 +35,7 @@ async function directProject(project, role, text) {
   const agents = S.agents.filter((a) => a.project === project);
   const target = (agents.find((a) => a.role === role) || {}).agent || pr.lead || (agents.find((a) => a.role === 'lead') || {}).agent;
   if (!target) throw new Error('This project has no lead agent yet.');
-  await db.collection('directives').add({ to: target, project, from: 'ceo', text, timestamp: new Date().toISOString(), read: false });
+  await db.collection('directives').add({ to: target, project, from: 'ceo', via: 'page', text, timestamp: new Date().toISOString(), read: false });
   wakeAgent(target);
   return target;
 }

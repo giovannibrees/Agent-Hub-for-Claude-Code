@@ -106,7 +106,7 @@ async function act(id, action, text) {
       if (action === 'feedback') perQ = parsePerNumber(text);
       const proj = S.projects.find((p) => p.name === it.project) || {};
       const to = action === 'ship' && proj.lead ? proj.lead : it.agent;
-      await write(() => db.doc(`answers/${id}`).set({ item_id: id, agent: to, project: it.project, title: it.title, decision: action, text: text || '',
+      await write(() => db.doc(`answers/${id}`).set({ item_id: id, agent: to, project: it.project, title: it.title, decision: action, via: 'page', text: text || '',
         per_question: perQ, recommendation: it.recommendation || null, meaning: MEANING[action], answered_at: now, read: false, attachments: files }));
       const check = await db.doc(`answers/${id}`).get();
       if (!check.exists) throw { code: 'not_saved' };
@@ -164,7 +164,7 @@ async function sendMessage(agent, btn) {
   btn.disabled = true;
   try {
     const ag = S.agents.find((a) => a.agent === agent) || {};
-    await db.collection('directives').add({ to: agent, project: ag.project || '', from: 'ceo', text, timestamp: new Date().toISOString(), read: false });
+    await db.collection('directives').add({ to: agent, project: ag.project || '', from: 'ceo', via: 'page', text, timestamp: new Date().toISOString(), read: false });
     wakeAgent(agent);
     delete msgDrafts[agent];
     render();

@@ -476,6 +476,8 @@ textarea { width: 100%; resize: vertical; line-height: 1.5; }
 // Filled in at publish time so start lines can point agents at this page.
 const HUB_URL = 'HUB_URL_PLACEHOLDER';
 const STALE_MIN = 30;
+// Each hub has its own title ("Recipe Box Hub"); the tab shows it with the count of open cards.
+const BASE_TITLE = (document.title || 'Agent Hub').replace(/^\(\d+\)\s*/, '');
 const TYPE_LABEL = { status: 'Status', question: 'Question', approval: 'Approval', delivery: 'Delivery', idea: 'Idea', handover: 'Handover', audit: 'Audit' };
 const DECISION_LABEL = { approve: 'Approved', feedback: 'Feedback', more_info: 'Asked for more info', reject: 'Not approved', auto: 'Auto-proceeded (no answer in 4h)', ship: 'Ship it' };
 const MEANING = {
@@ -557,7 +559,13 @@ function violations(it) {
 
 // ---------- rendering ----------
 
-function isRunning(a) { return Date.now() - ms(a.last_seen) < STALE_MIN * 60000; }
+// Running: seen in the last 30 minutes, or asleep on purpose until a check that is not overdue yet.
+// Delivered and stopped agents are not running.
+function isRunning(a) {
+  if (a.state === 'stopped') return false;
+  if (Date.now() - ms(a.last_seen) < STALE_MIN * 60000) return true;
+  return a.state !== 'delivered' && !!a.next_check_at && ms(a.next_check_at) + 10 * 60000 > Date.now();
+}
 
 // ---------- one-click start: cloud sessions through the Claude Code connector ----------
 const CC = 'Claude Code Remote';
@@ -618,14 +626,14 @@ function markStartBlocked() { startBlocked = true; try { localStorage.setItem('h
 // One message that starts every stopped agent of a project, for a Claude Code session to run.
 function startRequest(project) {
   const p = S.projects.find((x) => x.name === project) || {};
-  const list = S.agents.filter((a) => a.project === project && !isRunning(a))
+  const list = S.agents.filter((a) => a.project === project && !isRunning(a) && a.state !== 'delivered')
     .sort((x, y) => (roleOf(y.agent) === 'lead') - (roleOf(x.agent) === 'lead'));
   const src = githubRepo(p.repo);
   return [`Start the Agent Hub agents of project "${project}". For each agent below, in this order, create a Claude Code cloud session with the create_session tool of the Claude Code Remote connector: permission_mode "auto", title "<agent> (Agent Hub)"${src ? `, source_url "${src}"` : ''}, and the agent's start line as the prompt.`,
     `After each start, record it in the hub with the ArtifactData tool: action "update", url ${HUB_URL}, collection "agents", doc_id the agent's name, data {"session_id": <id>, "session_url": "https://claude.ai/code/<id>", "started_at": <now>, "state": "started"}. Then reply with one line per agent and stop.`, '',
     ...list.map((a, i) => `${i + 1}. ${a.agent}\nStart line: ${startLine(a.agent, a.role || roleOf(a.agent), project, p.repo || '')}`)].join('\n');
 }
-function stoppedCount(project) { return S.agents.filter((a) => a.project === project && !isRunning(a)).length; }
+function stoppedCount(project) { return S.agents.filter((a) => a.project === project && !isRunning(a) && a.state !== 'delivered').length; }
 
 // Agents write next_check_at when they schedule their next check. One that missed it by more
 // than 10 minutes has most likely been shut down while idle.
@@ -810,7 +818,7 @@ async function directProject(project, role, text) {
   const agents = S.agents.filter((a) => a.project === project);
   const target = (agents.find((a) => a.role === role) || {}).agent || pr.lead || (agents.find((a) => a.role === 'lead') || {}).agent;
   if (!target) throw new Error('This project has no lead agent yet.');
-  await db.collection('directives').add({ to: target, project, from: 'ceo', text, timestamp: new Date().toISOString(), read: false });
+  await db.collection('directives').add({ to: target, project, from: 'ceo', via: 'page', text, timestamp: new Date().toISOString(), read: false });
   wakeAgent(target);
   return target;
 }
@@ -1198,8 +1206,14 @@ function renderTabs() {
 // A card that a newer card replies to (a new design after feedback, an answer to More info) is
 // replaced: it is hidden everywhere except search results.
 function replacedIds(items) {
-  const byId = new Set(items.map((i) => i.id));
-  return new Set(items.map((i) => i.reply_to).filter((id) => id && byId.has(id)));
+  const byId = new Map(items.map((i) => [i.id, i]));
+  const NEW_VERSION = ['approval', 'question', 'delivery'];
+  return new Set(items.filter((i) => i.reply_to && byId.has(i.reply_to)).filter((i) => {
+    const old = byId.get(i.reply_to);
+    // A new card of the same kind replaces the old one. Any other reply (a status) only hides
+    // the old card once it is closed, so an open question never disappears.
+    return NEW_VERSION.includes(i.type) || !(old.needs_me && old.status === 'open');
+  }).map((i) => i.reply_to));
 }
 function render() {
   pickProject();
@@ -1248,7 +1262,7 @@ function renderView() {
   document.getElementById('t-running-label').textContent = S.agents.length ? `of ${S.agents.length} agents running` : 'Agents running';
   document.getElementById('t-deliveries').textContent = S.items.filter((i) => i.type === 'delivery' && i.status === 'open').length;
   document.getElementById('t-ideas').textContent = S.items.filter((i) => i.type === 'idea' && ['parked', 'kept'].includes(i.status)).length;
-  document.title = all ? `(${all}) Agent Hub` : 'Agent Hub';
+  document.title = all ? `(${all}) ${BASE_TITLE}` : BASE_TITLE;
 
   section('needs', needs, snoozedList.length ? 'Nothing needs you right now, apart from snoozed cards.' : 'Nothing needs you right now.');
   document.getElementById('snoozed-wrap').hidden = !snoozedList.length;
@@ -1388,7 +1402,7 @@ async function act(id, action, text) {
       if (action === 'feedback') perQ = parsePerNumber(text);
       const proj = S.projects.find((p) => p.name === it.project) || {};
       const to = action === 'ship' && proj.lead ? proj.lead : it.agent;
-      await write(() => db.doc(`answers/${id}`).set({ item_id: id, agent: to, project: it.project, title: it.title, decision: action, text: text || '',
+      await write(() => db.doc(`answers/${id}`).set({ item_id: id, agent: to, project: it.project, title: it.title, decision: action, via: 'page', text: text || '',
         per_question: perQ, recommendation: it.recommendation || null, meaning: MEANING[action], answered_at: now, read: false, attachments: files }));
       const check = await db.doc(`answers/${id}`).get();
       if (!check.exists) throw { code: 'not_saved' };
@@ -1446,7 +1460,7 @@ async function sendMessage(agent, btn) {
   btn.disabled = true;
   try {
     const ag = S.agents.find((a) => a.agent === agent) || {};
-    await db.collection('directives').add({ to: agent, project: ag.project || '', from: 'ceo', text, timestamp: new Date().toISOString(), read: false });
+    await db.collection('directives').add({ to: agent, project: ag.project || '', from: 'ceo', via: 'page', text, timestamp: new Date().toISOString(), read: false });
     wakeAgent(agent);
     delete msgDrafts[agent];
     render();
@@ -1661,8 +1675,16 @@ document.addEventListener('change', (e) => {
     const name = e.target.dataset.budget;
     const v = e.target.value.trim() === '' ? 0 : Number(e.target.value);
     if (!Number.isFinite(v) || v < 0) return;
+    const p = S.projects.find((x) => x.name === name) || {};
     db.doc(`projects/${name}`).update({ budget_usd: Math.round(v * 100) / 100 })
-      .then(() => { delete budgetDrafts[name]; render(); })
+      .then(async () => {
+        delete budgetDrafts[name]; render();
+        // A paused project restarts only when its lead hears about the new budget.
+        if (p.budget_paused && v > Number(p.spent_usd || 0) && p.lead) {
+          try { await db.collection('directives').add({ to: p.lead, project: name, from: 'ceo', via: 'page', text: `Budget raised to $${v.toFixed(2)}. Clear budget_paused and budget_warned and restart the agents that stopped for the budget.`, timestamp: new Date().toISOString(), read: false }); } catch (x) { /* the lead sees budget_usd on its next check */ }
+          wakeAgent(p.lead);
+        }
+      })
       .catch((x) => projectMsg(name, saveMessage(x)));
     return;
   }
@@ -1708,7 +1730,7 @@ document.getElementById('bc-form').addEventListener('submit', async (e) => {
   const bid = `bc_${Date.now().toString(36)}`;
   let sent = 0;
   for (const l of leads) {
-    try { await db.collection('directives').add({ to: l.agent, project: l.project || '', from: 'ceo', text, broadcast: bid, timestamp: new Date().toISOString(), read: false }); sent++; wakeAgent(l.agent); } catch (x) { break; }
+    try { await db.collection('directives').add({ to: l.agent, project: l.project || '', from: 'ceo', via: 'page', text, broadcast: bid, timestamp: new Date().toISOString(), read: false }); sent++; wakeAgent(l.agent); } catch (x) { break; }
   }
   btn.disabled = false;
   st.textContent = sent === leads.length ? `Sent to ${sent} lead${sent === 1 ? '' : 's'}: ${leads.map((l) => l.agent).join(', ')}.` : `Sent to ${sent} of ${leads.length} leads. Try again for the rest.`;
