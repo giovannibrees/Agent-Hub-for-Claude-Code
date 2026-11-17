@@ -87,7 +87,7 @@ function cardHtml(it, opts) {
     const un = unreadFor(it.id);
     const ans = S.unread.concat(S.answersAll || []).find((x) => x.item_id === it.id) || {};
     const af = arr(it.answer.attachments || ans.attachments);
-    parts.push(`<p class="answer"><strong>${esc(DECISION_LABEL[it.answer.decision] || it.answer.decision)}</strong> ${ago(it.answer.at)}${it.answer.text ? `: ${esc(it.answer.text)}` : ''}${af.length ? ` (${af.length} file${af.length === 1 ? '' : 's'} attached)` : ''}${un ? `<br><span class="hint">Not picked up yet${Date.now() - ms(it.answer.at) > 30 * 60000 ? '. The lead takes it over on its next check' : ''}.</span>` : ''}</p>`);
+    parts.push(`<p class="answer"><strong>${esc(DECISION_LABEL[it.answer.decision] || it.answer.decision)}</strong> ${ago(it.answer.at)}${it.answer.text ? `: ${esc(it.answer.text)}` : ''}${af.length ? ` (${af.length} file${af.length === 1 ? '' : 's'} attached)` : ''}${un ? `<br><span class="hint">Not picked up yet${Date.now() - ms(it.answer.at) > 30 * 60000 ? (roleOf(it.agent || '') === 'lead' ? '. The watchdog wakes the lead within the hour' : '. The lead takes it over on its next check') : ''}.</span>` : ''}</p>`);
   }
   const proj = S.projects.find((p) => p.name === it.project) || {};
   const shippable = opts.ack && it.type === 'delivery' && it.status === 'open' && !(it.pr && it.pr.merged) && (it.pr || proj.live_url);

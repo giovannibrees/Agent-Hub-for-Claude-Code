@@ -53,7 +53,7 @@ The lead sets the checks each task needs when planning:
 | code | reviewer (or the lead in a Solo team) | always |
 | security | security | login, accounts, permissions, user input, uploads, payments, personal data, secrets, database queries, external APIs, new dependencies |
 | qa | qa (or the designer for pure visual work) | anything a user sees or clicks |
-| codex | codex | every task, when the team has a codex agent |
+| codex | codex or checker | every task, when the team has a codex agent, or a checker and Codex can run |
 
 In a Lean team the **checker** agent runs code, security, Codex (and QA when there is no qa
 agent) in one pass and records each as its own result.

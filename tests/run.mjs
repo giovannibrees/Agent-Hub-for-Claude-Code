@@ -235,6 +235,26 @@ test('A rejected design checkpoint does not show as approved', async () => {
   await p.done();
 });
 
+test('Answering a card presses the agent\'s wake button', async () => {
+  const p = await open();
+  await card(p, 'Payments before').locator('[data-act=approve]').click();
+  await p.waitForTimeout(900);
+  const wakes = (await p.evaluate(() => window.HUB_CALLS)).filter((c) => c[0] === 'fire_trigger');
+  check(wakes.length === 1 && wakes[0][1].trigger_id === 'trig_wake_lead-gym-app', `bad wakes ${JSON.stringify(wakes)}`);
+  await p.done();
+});
+
+test('Agent-written task fields cannot inject markup', async () => {
+  const p = await open();
+  await p.evaluate(async () => { const db = await window.HUB_DEMO.use('db');
+    await db.doc('tasks/gym-app--T-99').set({ project: 'gym-app', id: '<img id=pwn1 src=x>', title: 'x', status: 'in-progress', owner: 'builder-gym-app',
+      checks_required: ['<img id=pwn2 src=x>'], checks: {} }); });
+  await p.waitForTimeout(500);
+  await p.evaluate(() => document.querySelectorAll('details[id^=plan-]').forEach((d) => { d.open = true; }));
+  check(await p.locator('#pwn1, #pwn2').count() === 0, 'markup from task fields was rendered');
+  await p.done();
+});
+
 test('Brief helper writes the brief and names what is missing', async () => {
   const p = await open();
   await p.click('#add-toggle'); await p.click('#brief-help summary');
@@ -312,7 +332,7 @@ test('Progress card shows steps in plain words', async () => {
   const p = await open();
   const card = p.locator('#progress article', { hasText: 'gym-app' }).first();
   const text = await card.textContent();
-  check(/Step \d+ of 12/.test(text), `no step count: ${text.slice(0, 80)}`);
+  check(/Step 6 of 13/.test(text) && /Design approved/.test(text), `no step count: ${text.slice(0, 80)}`);
   check(/First preview link for you to try/.test(text) && /Live on book\.fitclub\.example/.test(text), 'no preview or live step');
   check(/press Ship it/.test(text), 'delivery step does not mention Ship it');
   check(/Plan approved/.test(text) && /T-1 Signup and login: done/.test(text), 'done steps missing');

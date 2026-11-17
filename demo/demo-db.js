@@ -96,12 +96,13 @@
   // A pretend Claude Code connector, so "Start in the cloud" and costs can be tried in the demo.
   let n = 0;
   const mcp = {
-    listTools: async () => ({ servers: [{ server: 'Claude Code Remote', tools: [{ name: 'list_environments' }, { name: 'create_session' }, { name: 'get_session' }, { name: 'create_trigger' }] }] }),
+    listTools: async () => ({ servers: [{ server: 'Claude Code Remote', tools: [{ name: 'list_environments' }, { name: 'create_session' }, { name: 'get_session' }, { name: 'create_trigger' }, { name: 'fire_trigger' }] }] }),
     callTool: async (server, tool, input) => {
       window.HUB_CALLS.push([tool, clone(input || {})]);
       await new Promise((r) => setTimeout(r, faults().mcpDelay ?? 500));
       if (faults().mcp) throw err(faults().mcp, 'simulated');
       if (tool === 'list_environments') return { payload: { environments: [{ environment_id: 'env_demo', name: 'Default', state: 'active' }] } };
+      if (tool === 'fire_trigger') return { payload: { ok: true } };
       if (tool === 'create_trigger') return { payload: { trigger: { id: `trig_demo${++n}` } } };
       if (tool === 'create_session') return { payload: { ccr: { id: `session_demo${++n}` } } };
       if (tool === 'get_session') {

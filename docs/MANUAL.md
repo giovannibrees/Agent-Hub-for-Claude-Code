@@ -66,7 +66,7 @@ can create artifacts:
 
 ```text
 Set up the Agent Hub from https://github.com/giovannibrees/Claude-Dashboard for me:
-1. Publish cloud/agent-hub.html as an artifact with the db and assets capabilities, and the mcp capability for the "Claude Code Remote" connector with the tools list_environments, create_session, get_session and create_trigger.
+1. Publish cloud/agent-hub.html as an artifact with the db and assets capabilities, and the mcp capability for the "Claude Code Remote" connector with the tools list_environments, create_session, get_session, create_trigger and fire_trigger.
 2. Replace HUB_URL_PLACEHOLDER in the page with the artifact's own URL and publish it again to the same URL.
 3. Store the text of cloud/PROTOCOL.md in the artifact's database: collection "config", doc "protocol", field "text".
 4. Store the text of ROLES.md the same way: collection "config", doc "roles", field "text".
@@ -540,15 +540,12 @@ first one to real users; deleting data and turning on real payments still get th
 
 ### Releases
 
-Each project card has **Release automatically when all checks pass** (on by default). When every
-task is done, every check passed and the security sweep is clean, the lead releases and posts a
-"Released" update. You always get an approval card first for:
-
-- the first release to real users,
-- database changes that delete or reshape data,
-- anything touching payments.
-
-Turn the switch off to approve every release yourself.
+Each project card has **Deploy previews automatically (production only on Ship it)**, on by
+default: after each finished epic the lead deploys the project to a preview link you can click
+through. Production, meaning your live URL or anything real users see, only changes when you
+press **Ship it** on the delivery. Deleting or reshaping existing data and turning on real
+payments always get their own approval card as well. Turn the switch off and previews are only
+made when you ask.
 
 ### Lessons
 
@@ -646,7 +643,8 @@ Each agent makes its own wake button (a scheduled task that only runs when press
 each other's when they hand over work, so the next agent starts within a minute instead of at its
 next timed check. The **Agent Hub watchdog** scheduled task runs every hour and wakes any agent
 more than 15 minutes past its check. Set it up once by asking Claude Code: "Create the Agent Hub
-watchdog scheduled task from docs/MANUAL.md" (the prompt is in `docs/watchdog-prompt.md`).
+watchdog scheduled task from docs/watchdog-prompt.md". The page also presses an agent's wake
+button when you answer a card or send it a message.
 
 ### Keeping cost down
 

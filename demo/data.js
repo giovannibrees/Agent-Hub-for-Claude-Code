@@ -62,9 +62,11 @@ const DATA = {
 
 // Sessions and a budget, so cost per project shows in the demo.
 const SESS = { 'lead-gym-app': 'session_demo_lead', 'builder-gym-app': 'session_demo_b1', 'builder-2-gym-app': 'session_demo_b2', 'reviewer-gym-app': 'session_demo_rev' };
-DATA.agents.forEach((a) => { if (SESS[a.agent]) { a.session_id = SESS[a.agent]; } });
+DATA.agents.forEach((a) => { if (SESS[a.agent]) { a.session_id = SESS[a.agent]; a.wake_trigger_id = `trig_wake_${a.agent}`; } });
 DATA.projects.forEach((p) => { if (p.name === 'gym-app') p.budget_usd = 75; });
 // Auto-build: project types, a live URL with Ship it, and a project built by the Lean team.
+DATA.items.push({ id: 'i30', timestamp: iso(60 * 30), agent: 'lead-gym-app', project: 'gym-app', type: 'approval', title: 'Design for gym-app', priority: 'normal', status: 'answered', needs_me: false,
+  bullets: ['Booking screen, class list and account pages', 'Large tap targets for members over 60'], recommendation: 'Approve the design', reversible: false, answer: { decision: 'approve', at: iso(60 * 29) } });
 DATA.projects.forEach((p) => {
   if (p.name === 'gym-app') { p.kind = 'saas'; p.live_url = 'book.fitclub.example'; }
   if (p.name === 'client-portal') p.kind = 'webapp';

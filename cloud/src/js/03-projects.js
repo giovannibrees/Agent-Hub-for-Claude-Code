@@ -36,6 +36,7 @@ async function directProject(project, role, text) {
   const target = (agents.find((a) => a.role === role) || {}).agent || pr.lead || (agents.find((a) => a.role === 'lead') || {}).agent;
   if (!target) throw new Error('This project has no lead agent yet.');
   await db.collection('directives').add({ to: target, project, from: 'ceo', text, timestamp: new Date().toISOString(), read: false });
+  wakeAgent(target);
   return target;
 }
 
@@ -57,7 +58,7 @@ function checksText(t) {
   const req = arr(t.checks_required);
   if (!req.length || t.status === 'backlog' || t.status === 'ready-for-dev') return '';
   const c = t.checks || {};
-  return ' · ' + req.map((k) => `${k} ${c[k] ? (c[k].result === 'pass' ? 'passed' : 'failed') : 'pending'}`).join(', ');
+  return ' · ' + req.map((k) => `${esc(k)} ${c[k] ? (c[k].result === 'pass' ? 'passed' : 'failed') : 'pending'}`).join(', ');
 }
 
 // Short, computed summary of the last 24 hours per project, most important project first. No agent, no cost.
@@ -147,7 +148,7 @@ function statusLine(p, tasks) {
   const asleep = ag.filter(isAsleep).length;
   if (asleep) parts.push(`<strong>${asleep} asleep</strong>`);
   const doing = tasks.filter((t) => t.status === 'in-progress');
-  if (doing.length) parts.push(`${doing.map((t) => t.id).join(', ')} in progress`);
+  if (doing.length) parts.push(`${doing.map((t) => esc(t.id)).join(', ')} in progress`);
   const review = tasks.filter((t) => t.status === 'review').length;
   if (review) parts.push(`${review} in review`);
   const done = tasks.filter((t) => t.status === 'done').length;
@@ -175,7 +176,7 @@ function renderProjects() {
       ${stoppedCount(p.name) && (startBlocked || !mcp) ? `<div class="start-row"><button type="button" class="btn" data-copy-start="${esc(p.name)}">Copy start request</button><span class="hint">${stoppedCount(p.name)} agent${stoppedCount(p.name) === 1 ? '' : 's'} not running. Paste it into a Claude Code session to start ${stoppedCount(p.name) === 1 ? 'it' : 'them'}.</span></div>` : ''}
       <label class="prio" for="prio-${esc(p.name)}">Priority <select id="prio-${esc(p.name)}" data-prio="${esc(p.name)}">${['P1', 'P2', 'P3'].map((v) => `<option${(p.priority || 'P2') === v ? ' selected' : ''}>${v}</option>`).join('')}</select></label>
       ${costHtml(p)}
-      <label class="auto" for="auto-${esc(p.name)}"><input type="checkbox" id="auto-${esc(p.name)}" data-auto="${esc(p.name)}"${p.auto_release === false ? '' : ' checked'}> Release automatically when all checks pass</label>
+      <label class="auto" for="auto-${esc(p.name)}"><input type="checkbox" id="auto-${esc(p.name)}" data-auto="${esc(p.name)}"${p.auto_release === false ? '' : ' checked'}> Deploy previews automatically (production only on Ship it)</label>
       ${p.goal ? `<p>${esc(p.goal)}</p>` : ''}
       ${p.kind && p.kind !== 'other' || p.live_url ? `<p class="hint">${p.kind && KIND_LABEL[p.kind] ? esc(KIND_LABEL[p.kind]) : ''}${p.kind && p.kind !== 'other' && p.live_url ? ' · ' : ''}${p.live_url ? `live at <a href="${esc(/^https?:/.test(p.live_url) ? p.live_url : `https://${p.live_url}`)}" target="_blank" rel="noopener">${esc(host(p.live_url))}</a>${p.live_check && p.live_check.ok ? ' (checked)' : ''}` : ''}</p>` : ''}
       <div class="seg" role="img" aria-label="${n.done} of ${tasks.length} tasks done">${seg}</div>
@@ -237,8 +238,7 @@ function progressHtml(p) {
     if (g) return { state: 'now', text: `${label}: being reworked after your ${DECISION_LABEL[d] ? DECISION_LABEL[d].toLowerCase() : 'answer'}` };
     return newApp ? { state: 'todo', text: todo } : null;
   };
-  const designGate = gate(/\bdesign\b/i);
-  const design = designGate || phase === 'planning' ? gateStep(designGate, 'Design', 'Design for you to approve') : null;
+  const design = gateStep(gate(/^design\b/i), 'Design', 'Design for you to approve');
   if (design) steps.push(design);
   for (const t of tasks) {
     const title = `${t.id} ${t.title || ''}`.trim();
@@ -290,7 +290,7 @@ function progressHtml(p) {
 }
 
 function renderProgress() {
-  const list = S.projects.filter((p) => p.phase !== 'complete').sort((a, b) => PRIO_RANK[a.priority || 'P2'] - PRIO_RANK[b.priority || 'P2']);
+  const list = S.projects.filter((p) => p.phase !== 'complete' || (p.live_url && !(p.live_check && p.live_check.ok))).sort((a, b) => PRIO_RANK[a.priority || 'P2'] - PRIO_RANK[b.priority || 'P2']);
   document.getElementById('progress-block').hidden = !list.length;
   document.getElementById('progress').innerHTML = list.map(progressHtml).join('');
 }

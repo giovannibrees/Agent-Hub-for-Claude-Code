@@ -170,7 +170,7 @@ document.getElementById('bc-form').addEventListener('submit', async (e) => {
   const bid = `bc_${Date.now().toString(36)}`;
   let sent = 0;
   for (const l of leads) {
-    try { await db.collection('directives').add({ to: l.agent, project: l.project || '', from: 'ceo', text, broadcast: bid, timestamp: new Date().toISOString(), read: false }); sent++; } catch (x) { break; }
+    try { await db.collection('directives').add({ to: l.agent, project: l.project || '', from: 'ceo', text, broadcast: bid, timestamp: new Date().toISOString(), read: false }); sent++; wakeAgent(l.agent); } catch (x) { break; }
   }
   btn.disabled = false;
   st.textContent = sent === leads.length ? `Sent to ${sent} lead${sent === 1 ? '' : 's'}: ${leads.map((l) => l.agent).join(', ')}.` : `Sent to ${sent} of ${leads.length} leads. Try again for the rest.`;

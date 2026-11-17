@@ -32,7 +32,8 @@ cleanup, docs.
    public-facing, production data) or a scope change: wait for the CEO. No exceptions.
 7. When your work is delivered, post a delivery item and stop. Do not invent new work.
    You may stop with questions still open: never keep looping only to wait for an answer.
-   The lead picks up answers you have not read (section 7).
+   The lead picks up answers you have not read (section 7). The lead is the exception: it keeps
+   checking until the project delivery is shipped or acknowledged (section 7).
 8. Work only on tasks from the plan. New ideas and unplanned features become `idea` items
    and wait until the build is complete. Never build them on the side.
 9. Post a status item at least every 2 hours while working.
@@ -45,6 +46,9 @@ cleanup, docs.
 
 Each check is one iteration. Do not rely on `/loop`: it is not available in every session, and an idle session can be shut down. Each iteration, in this order:
 
+0. Budget: `get` your project; if `budget_paused` is true, set your agents doc `state: "stopped"`
+   and end the loop without scheduling a next check. The lead wakes you when the CEO raises the
+   budget.
 1. Heartbeat: `update` collection `agents`, doc_id = your name, data
    `{"last_seen": "<now ISO>", "state": "working", "current_task": "<id or empty>",
    "doing": "<what you are doing right now, plain words, max 80 characters>"}`. The CEO's progress
@@ -175,8 +179,11 @@ a push and an email. One alert per item, never for status, idea or delivery item
   The reviewer, security and qa agents each `query` `tasks` with where
   `[["project","==","<project>"],["status","==","review"]]` and take the tasks that require
   their check and have no result for it yet. Order: `code`, `security` and `codex` in parallel,
-  `qa` after they passed. Record a result with `update`:
-  `{"checks": {"<kind>": {"result": "pass" | "fail", "by": "<you>", "at": "<now>", "note": "<one line>"}}}`.
+  `qa` after they passed. Record a result: `get` the task, add your result to its existing
+  `checks` map (`"<kind>": {"result": "pass" | "fail", "by": "<you>", "at": "<now>", "note": "<one line>"}`),
+  and write the whole map back with `update` `{"checks": {...}}` and `if_version`. On a version
+  conflict, read again and merge again: an update replaces the whole `checks` field, so never
+  write only your own key. A checker writes all its results in one update.
 - A failed check: set the task `status: in-progress`, `review_loops` + 1, and send the owner a
   directive with the findings (file, line, what goes wrong, severity). The same builder fixes it.
 - All checks passed: the agent that records the last passing check wakes the task's `owner` and
@@ -185,7 +192,9 @@ a push and an email. One alert per item, never for status, idea or delivery item
   full tests and build on the merged result, sets the task `done` with that evidence and
   `merged_at`, and wakes the lead. Merge conflict or red tests: fix them on the task branch and run
   the checks again. Only tasks with every check in `checks_required` at `result: pass` become
-  `done`; the lead audits `done` tasks and may reopen one with a directive.
+  `done`, and only the owner sets `done` (after the merge). The lead never sets `done`: it audits
+  merged `done` tasks and reopens one with a directive when the merge or evidence is wrong. In a
+  team without a builder, the lead merges and sets `done` itself.
   More than 5 review loops on one task: the lead asks the CEO.
 - GitHub: when the task's work is in a pull request, set
   `pr: {"url": "<pull request url>", "number": 12, "ci": "pending" | "pass" | "fail", "checked_at": "<now>"}`
@@ -264,7 +273,9 @@ Phase planning (you are the lead and the project is in `planning`):
    - `checks_required`: `code` always; `security` for login, accounts, permissions, user input,
      uploads, payments, personal data, secrets, database queries, external APIs or new
      dependencies; `qa` for anything a user sees or clicks; `codex` on every task when the team
-     has a `codex` or a `checker` agent. A `checker` agent covers `code`, `security`, `codex` and
+     has a `codex` agent, or a `checker` agent and Codex can run (check during planning:
+     `codex --version` works or installs, and `OPENAI_API_KEY` is set or a network proxy adds it;
+     if not, leave `codex` out and mention it in the plan card). A `checker` agent covers `code`, `security`, `codex` and
      `qa`, so in a team with a checker set these checks by the rules above as if each role were
      there. Otherwise leave out a check whose role is not in the team; the lead does the code
      check in a team without a reviewer or checker.
@@ -274,7 +285,7 @@ Phase planning (you are the lead and the project is in `planning`):
    where it goes live), recommendation "Approve and start building", `reversible: false`.
    Checkpoints for `kind` other than `other`, each an approval card the CEO answers: the plan,
    then "Design for <project>" (screenshots and a color table, before the first screen is
-   built), then "First preview of <project>" (a `preview_url` the CEO can click through, once
+   built; by the designer, or by the builder as the first task in a team without one), then "First preview of <project>" (a `preview_url` the CEO can click through, once
    the main journey works end to end), then the delivery with Ship it.
 6. Approved: set the project `phase: building` and send each agent a directive with its first
    task (`directives`: `{to, project, from: "<you>", text, timestamp, read: false}`).
@@ -313,8 +324,9 @@ Phase building, about every 30 minutes:
   30 minutes while it owns an in-progress task, no status for 2 hours, work without a task or
   outside scope, handovers not accepted within an hour, tasks waiting in review, items that
   break the rules.
-- Correct agents with directives. Review tasks in `review` against the real diff and test
-  output, never the agent's own summary, then set `done` with evidence or send them back.
+- Correct agents with directives. Audit `done` tasks against the real merged diff and test
+  output, never the agent's own summary; reopen with a directive when something is wrong. Tasks
+  stuck in `review`: find out which check is missing and wake that agent.
 - For every task in `review` with a `pr`, read the pull request's checks on its latest commit and
   update `pr.ci` and `pr.checked_at`. A task whose `ci` is `fail` cannot be `done`.
 - Post one `audit` item (`priority: high`) only when the CEO should look. Otherwise stay quiet.
@@ -322,18 +334,22 @@ Phase building, about every 30 minutes:
   unblock it or escalate.
 - Deliveries: when a delivery item's `pr` is merged, set the item `status: acknowledged` with
   `auto_closed: "PR merged"`. The CEO no longer needs to file it.
-- All tasks done: ask security (if in the team) for the whole-codebase sweep, run a final
-  review, then release (below), set the project `phase: complete`, post the project delivery.
+- All tasks done: ask security for the whole-codebase sweep (the checker does it in a Lean
+  team; in a team with neither, do it yourself), run a final review, then post the project
+  delivery. Keep your agents doc `state: "working"` and keep checking (about every 30 minutes,
+  your wake button brings you sooner) until the CEO answers it: Ship it, feedback or reject.
+  Set the project `phase: complete` only after a passing `live_check`, or when the project has
+  no `live_url` and the CEO acknowledged the delivery.
 
-Release (deploy or merge to the live version):
-- Ready means: every task `done` with all checks passed, the full test suite and build pass on
-  the merged code, and the security sweep found no critical or high issues.
-- The project's `auto_release` is true (the default) and none of the exceptions apply: release
-  yourself, then post a status item "Released <version>" with what changed (max 5 bullets).
-- Exceptions that always need an approval card first (`reversible: false`): the first release
-  to real users, database changes that delete or reshape existing data, anything touching
-  payments, or `auto_release` set to false by the CEO.
-- Release the same way mid-project when an epic is finished and these rules hold.
+Releases and production:
+- Production (the branch that deploys `live_url`, or anything real users see) changes ONLY
+  through the CEO's Ship it below. Never merge, push or deploy to it on your own.
+- Previews: when `auto_release` is true (the default), deploy the project branch to a preview
+  URL after an epic is finished and every task in it is `done`; post a status "Preview updated"
+  with the `preview_url`. `auto_release` false: only on request.
+- Ready to ship means: every task `done` with all checks passed, the full test suite and build
+  pass on the merged project branch, and the final security sweep found no critical or high
+  issues. Then post the delivery (with `pr` or the project branch link) and wait for Ship it.
 
 Ship it (an answer with decision `ship` on a delivery):
 - The CEO's Ship it is the approval for this release, including a first release to real users.

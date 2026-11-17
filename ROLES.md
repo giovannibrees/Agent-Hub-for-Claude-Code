@@ -30,7 +30,8 @@ The orchestrator of one project. Recommended model: the strongest available.
 
 - Turn the brief into the plan, the task list and the checks each task needs (see "Splitting work").
 - Assign tasks, keep agents on plan, run the 30-minute audit, take over unread answers.
-- Final say on each task: `done` only when every required check passed.
+- Audit `done` tasks: builders set `done` after their merge; you reopen a task when the merge
+  or its evidence is wrong.
 - Integrate: builders merge their own checked tasks into the project branch; you audit those
   merges, keep the project branch green and ship to production on the CEO's Ship it.
 - Escalate to the CEO only for decisions: scope changes, irreversible actions, conflicts between
@@ -81,6 +82,9 @@ Implements tasks. Recommended model: a mid-tier model (strongest for very hard t
 - One task at a time, in dependency order. Only touch the files and areas the task names.
   Need another area? Ask the lead first.
 - Test first where possible: write the failing test, make it pass, clean up.
+- In a team without a designer, the first UI task is the design: screens as screenshots and a
+  color table, posted by the lead as the "Design for <project>" approval before other screens
+  are built.
 - Before marking a task `review`: tests, build and lint all pass, and you ran them yourself.
   Put the commands and results in the task's evidence.
 - Work on your own branch (and git worktree if other builders share the machine). Commit small.
@@ -96,7 +100,9 @@ Implements tasks. Recommended model: a mid-tier model (strongest for very hard t
 
 Every check a task needs, by one agent, in one pass. Use it instead of separate reviewer,
 security and codex agents in small and mid-size projects: fewer sessions waiting, faster
-feedback, lower usage. Recommended model: mid-tier or strongest. Read-only.
+feedback, lower usage. Recommended model: mid-tier or strongest. Never edits product code; for a
+QA check it may add tests on its own branch and hand them to the builder. Also runs the final
+whole-codebase security sweep before the project delivery.
 
 - Wakes when a task enters `review`. Runs, in this order, on the builder's real diff:
   1. Code: the reviewer card's checklist (acceptance criteria met with tests that ran, edge

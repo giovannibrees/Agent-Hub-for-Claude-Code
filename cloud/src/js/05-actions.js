@@ -79,6 +79,16 @@ async function write(fn) {
   }
 }
 
+// Presses the agent's wake button (a scheduled task bound to its session) so it reads new work
+// within a minute instead of at its next timed check. Best effort: the next check picks it up anyway.
+let wakeOn = false;
+async function wakeAgent(name) {
+  const a = S.agents.find((x) => x.agent === name);
+  if (!wakeOn || !mcp || !a || !a.wake_trigger_id) return;
+  try { await mcp.callTool(CC, 'fire_trigger', { trigger_id: a.wake_trigger_id, text: 'Agent Hub: the CEO answered or sent you work. Run your next loop iteration now.' }); }
+  catch (e) { /* the agent's own next check reads it */ }
+}
+
 async function act(id, action, text) {
   const it = S.items.find((i) => i.id === id);
   if (!it || !db || saving[id]) return;
@@ -91,12 +101,15 @@ async function act(id, action, text) {
       let perQ = null;
       if (action === 'approve' && arr(it.recommendations).length > 1) { perQ = {}; it.recommendations.forEach((r, i) => { perQ[String(i + 1)] = r; }); }
       if (action === 'feedback') perQ = parsePerNumber(text);
-      await write(() => db.doc(`answers/${id}`).set({ item_id: id, agent: it.agent, project: it.project, title: it.title, decision: action, text: text || '',
+      const proj = S.projects.find((p) => p.name === it.project) || {};
+      const to = action === 'ship' && proj.lead ? proj.lead : it.agent;
+      await write(() => db.doc(`answers/${id}`).set({ item_id: id, agent: to, project: it.project, title: it.title, decision: action, text: text || '',
         per_question: perQ, recommendation: it.recommendation || null, meaning: MEANING[action], answered_at: now, read: false, attachments: files }));
       const check = await db.doc(`answers/${id}`).get();
       if (!check.exists) throw { code: 'not_saved' };
       await write(() => db.doc(`items/${id}`).update({ status: 'answered', needs_me: false, answer: { decision: action, text: text || '', at: now, attachments: files } }));
       delete drafts[id]; delete fbFiles[id];
+      wakeAgent(to);
     } else if (action === 'acknowledge') {
       await write(() => db.doc(`items/${id}`).update({ status: it.type === 'idea' ? 'archived' : 'acknowledged', acknowledged_at: now }));
     } else if (action === 'keep_idea') {
@@ -120,6 +133,7 @@ async function initCloud() {
     if (srv && (srv.tools || []).some((t) => t.name === 'create_session')) {
       mcp = m; render();
       triggerOn = (srv.tools || []).some((t) => t.name === 'create_trigger');
+      wakeOn = (srv.tools || []).some((t) => t.name === 'fire_trigger');
       if ((srv.tools || []).some((t) => t.name === 'get_session')) { costsOn = true; refreshCosts(); setInterval(refreshCosts, 10 * 60000); }
     }
   } catch (e) { mcp = null; }
@@ -140,6 +154,7 @@ async function sendMessage(agent, btn) {
   try {
     const ag = S.agents.find((a) => a.agent === agent) || {};
     await db.collection('directives').add({ to: agent, project: ag.project || '', from: 'ceo', text, timestamp: new Date().toISOString(), read: false });
+    wakeAgent(agent);
     delete msgDrafts[agent];
     render();
   } catch (e) { btn.disabled = false; btn.textContent = 'Retry'; }
