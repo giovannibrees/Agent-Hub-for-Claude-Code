@@ -312,7 +312,7 @@ Before we shipped this version, we pointed Agent Hub at its own code. Real agent
   agent other than the one who made it has tested it.
 
 The full reports the agents wrote are on the
-[selftest branch](https://github.com/giovannibrees/Claude-Dashboard/tree/selftest/docs): code
+[selftest branch](https://github.com/giovannibrees/Agent-Hub-for-Claude-Code/tree/selftest/docs): code
 audits in `docs/audits/`, user tests with screenshots in `docs/user-tests/`.
 
 ---
@@ -322,7 +322,7 @@ audits in `docs/audits/`, user tests with screenshots in `docs/user-tests/`.
 **1. Let Claude build your hub.** Paste this into any Claude chat or Claude Code session:
 
 ```text
-Set up the Agent Hub from https://github.com/giovannibrees/Claude-Dashboard for me:
+Set up the Agent Hub from https://github.com/giovannibrees/Agent-Hub-for-Claude-Code for me:
 1. Publish cloud/agent-hub.html as an artifact with the db and assets capabilities, and the mcp capability for the "Claude Code Remote" connector with the tools list_environments, create_session, get_session, create_trigger and fire_trigger.
 2. Replace HUB_URL_PLACEHOLDER in the page with the artifact's own URL and publish it again to the same URL.
 3. Store the text of cloud/PROTOCOL.md in the artifact's database: collection "config", doc "protocol", field "text".

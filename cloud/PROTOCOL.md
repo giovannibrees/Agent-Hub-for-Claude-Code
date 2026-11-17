@@ -243,7 +243,7 @@ Phase planning (you are the lead and the project is in `planning`):
    - Where it goes live: if `live_url` is set, find out what really serves it before planning
      (load the page, compare it with this repo's build output, read the deploy config). Write the
      answer as `deploy` on the project, for example "push to main; Cloudflare Workers Builds
-     deploys it" or "served by another repo: claude_fun landing-pages/citeengine". If this repo
+     deploys it" or "served by another repo: acme/marketing-site, folder site/". If this repo
      does not reach `live_url`, say so in the plan card: a delivery that cannot reach the live
      site is the CEO's call, not a surprise at the end.
    - Accounts: list what the build needs (GitHub repo, hosting, database, payments, email, API

@@ -17,6 +17,6 @@ inject = ''.join([
 ])
 title_end = page.index('</title>') + len('</title>')
 out = page[:title_end].replace('<title>Agent Hub</title>', '<title>Agent Hub Demo</title>') + '\n' + inject + page[title_end:]
-out = out.replace('HUB_URL_PLACEHOLDER', 'https://github.com/giovannibrees/Claude-Dashboard')
+out = out.replace('HUB_URL_PLACEHOLDER', 'https://github.com/giovannibrees/Agent-Hub-for-Claude-Code')
 (root / 'demo/agent-hub-demo.html').write_text(out)
 print('wrote demo/agent-hub-demo.html', len(out) // 1024, 'KB')

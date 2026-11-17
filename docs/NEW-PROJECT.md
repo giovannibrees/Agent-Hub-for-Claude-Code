@@ -8,7 +8,7 @@ gives you a request to paste into Claude Code. Claude then follows the steps bel
 
 1. Build the page: in this repo, `npm run build`.
 2. Make the page file: copy `cloud/agent-hub.html` and change its `<title>` to the project's
-   name in words plus "Hub", for example "Skill Tailor Hub".
+   name in words plus "Hub", for example "Recipe Box Hub".
 3. Publish it as a new artifact with these capabilities:
    `{"db": {}, "assets": {}, "mcp": {"servers": [{"server": "Claude Code Remote", "tools": ["list_environments", "create_session", "get_session", "create_trigger", "fire_trigger"]}]}}`.
 4. Replace `HUB_URL_PLACEHOLDER` in the file with the new artifact's URL and publish again to the

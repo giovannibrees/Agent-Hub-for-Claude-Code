@@ -283,13 +283,13 @@ test('Project tabs show one project at a time', async () => {
 test('A broadcast that reads like a new project offers to start one', async () => {
   const p = await open();
   await p.click('#bc-toggle');
-  await p.fill('#bc-text', 'Build "Skill Tailor", a web app that turns a company SOP into a Claude Agent Skill.');
+  await p.fill('#bc-text', 'Build "Recipe Box", a web app that turns family recipes into a shared cookbook.');
   await p.click('#bc-send'); await p.waitForTimeout(300);
   check(!(await p.evaluate(() => window.HUB_CALLS.length && false)), '');
   const dirs = await p.evaluate(async () => (await (await window.HUB_DEMO.use('db')).collection('directives').get()).size);
   check(dirs === 0, 'sent before asking');
   await p.click('[data-new-project]'); await p.waitForTimeout(200);
-  check(!(await p.locator('#add-panel').isHidden()) && /Skill Tailor/.test(await p.inputValue('#f-brief')) && (await p.inputValue('#f-name')) === 'skill-tailor', 'brief not carried to Add project');
+  check(!(await p.locator('#add-panel').isHidden()) && /Recipe Box/.test(await p.inputValue('#f-brief')) && (await p.inputValue('#f-name')) === 'recipe-box', 'brief not carried to Add project');
   await p.done();
 });
 

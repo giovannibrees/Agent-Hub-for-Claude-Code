@@ -564,7 +564,7 @@ textarea { width: 100%; resize: vertical; line-height: 1.5; }
 
 <main class="wrap">
   <p class="banner" id="offline" hidden>This page needs its database to work. Open it from claude.ai while signed in.</p>
-  <p class="banner demo" id="demo-banner" hidden>Demo with sample data: click anything, nothing is saved. <a href="https://github.com/giovannibrees/Claude-Dashboard" target="_blank" rel="noopener">Get your own Agent Hub</a></p>
+  <p class="banner demo" id="demo-banner" hidden>Demo with sample data: click anything, nothing is saved. <a href="https://github.com/giovannibrees/Agent-Hub-for-Claude-Code" target="_blank" rel="noopener">Get your own Agent Hub</a></p>
   <p class="banner" id="perm" hidden>Your answers cannot be saved: this page is not allowed to save to its database. <button type="button" class="btn" id="perm-fix">Allow saving</button></p>
 
   <nav class="strip" aria-label="Summary">
@@ -608,7 +608,7 @@ textarea { width: 100%; resize: vertical; line-height: 1.5; }
         <option value="tool">Internal tool for my team</option>
         <option value="other" selected>Something else, or a change to an existing app</option>
       </select></label>
-      <label for="f-live">Live URL, where it runs for real (optional) <input type="text" id="f-live" placeholder="citeengine.com or leave empty for a new app"></label>
+      <label for="f-live">Live URL, where it runs for real (optional) <input type="text" id="f-live" placeholder="yourapp.com, or leave empty for a new app"></label>
       <label for="f-repo" class="full">GitHub repo or folder (optional) <input type="text" id="f-repo" placeholder="github.com/you/gym-app or /Users/you/Projects/gym-app"></label>
       <details class="full brief-help" id="brief-help"><summary>Help me write the brief</summary>
         <div class="brief-grid">
@@ -698,7 +698,7 @@ textarea { width: 100%; resize: vertical; line-height: 1.5; }
 <script>
 'use strict';
 // Filled in at publish time so start lines can point agents at this page.
-const HUB_URL = 'https://github.com/giovannibrees/Claude-Dashboard';
+const HUB_URL = 'https://github.com/giovannibrees/Agent-Hub-for-Claude-Code';
 const STALE_MIN = 30;
 const TYPE_LABEL = { status: 'Status', question: 'Question', approval: 'Approval', delivery: 'Delivery', idea: 'Idea', handover: 'Handover', audit: 'Audit' };
 const DECISION_LABEL = { approve: 'Approved', feedback: 'Feedback', more_info: 'Asked for more info', reject: 'Not approved', auto: 'Auto-proceeded (no answer in 4h)', ship: 'Ship it' };
