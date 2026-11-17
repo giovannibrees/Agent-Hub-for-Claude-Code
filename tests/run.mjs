@@ -381,6 +381,41 @@ test('Raising the budget of a paused project wakes the lead', async () => {
   await p.done();
 });
 
+test('Problems view: each agent shows its state, stalled agents get Nudge', async () => {
+  const p = await open();
+  await p.evaluate(async () => { const db = await window.HUB_DEMO.use('db');
+    await db.doc('agents/reviewer-gym-app').update({ last_seen: new Date(Date.now() - 3 * 3600e3).toISOString(),
+      next_check_at: new Date(Date.now() - 2 * 3600e3).toISOString(), state: 'working' }); });
+  await p.waitForTimeout(500);
+  check(/stalled/.test(await p.locator('#agents-summary').textContent()), 'no stalled count in the summary');
+  const row = p.locator('#agents .agent', { hasText: 'reviewer-gym-app' });
+  check(/Stalled/.test(await row.textContent()), 'no Stalled label');
+  await row.locator('[data-nudge]').click(); await p.waitForTimeout(800);
+  const wakes = (await p.evaluate(() => window.HUB_CALLS)).filter((c) => c[0] === 'create_trigger' && c[1].persistent_session_id === 'session_demo_rev');
+  check(wakes.length === 1, 'Nudge did not wake the agent');
+  check(/Nudged/.test(await row.textContent()), 'no Nudged confirmation');
+  await p.done();
+});
+
+test('Team buttons send the lead a planning session, team review or brief request', async () => {
+  const p = await open();
+  const proj = p.locator('.project', { hasText: 'gym-app' }).first();
+  for (const kind of ['plan', 'review', 'brief']) { await proj.locator(`[data-team="${kind}"]`).click(); await p.waitForTimeout(300); }
+  const dirs = await p.evaluate(async () => (await (await window.HUB_DEMO.use('db')).collection('directives').where('to', '==', 'lead-gym-app').get()).docs.map((d) => d.data().text));
+  check(dirs.some((t) => /planning session/i.test(t)) && dirs.some((t) => /team review/i.test(t)) && dirs.some((t) => /Sharpen the brief/.test(t)), `missing requests ${JSON.stringify(dirs)}`);
+  await p.done();
+});
+
+test('New project saves its size', async () => {
+  const p = await open();
+  await p.click('#add-toggle');
+  await p.fill('#f-name', 'tiny'); await p.selectOption('#f-size', 'quick'); await p.fill('#f-brief', 'Fix the footer link.');
+  await p.click('#f-submit'); await p.waitForTimeout(400);
+  const proj = await dbGet(p, 'projects/tiny');
+  check(proj && proj.size === 'quick', `bad size ${JSON.stringify(proj && proj.size)}`);
+  await p.done();
+});
+
 test('Brief helper writes the brief and names what is missing', async () => {
   const p = await open();
   await p.click('#add-toggle'); await p.click('#brief-help summary');

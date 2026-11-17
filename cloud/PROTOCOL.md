@@ -61,11 +61,14 @@ Each check is one iteration. Do not rely on `/loop`: it is not available in ever
 3. Directives: `query` collection `directives` with where `[["to","==","<you>"],["read","==",false]]`.
    Act on each, then mark `{"read": true}`.
 4. Work on your current task. Post items as needed.
-5. Pace the loop to keep cost low: about 5 minutes in planning, longer while busy with a long
-   task, about 30 minutes for the lead's audits. Waiting on the CEO for a decision that blocks
-   others (the plan, a release, a scope change): about 5 minutes for the first 30 minutes after
-   you posted it, then about 15 minutes. Blocked on everything else and only waiting for
-   answers: about 60 minutes between checks. Delivered: end the loop.
+5. Pace the loop to keep cost low. Every check costs the CEO usage, so rest when nothing can move:
+   - Working on a task: check as often as the work needs; about 30 minutes for the lead's audits.
+   - Waiting on the CEO (a plan, design, preview, release, scope change or to-do card): about
+     every 10 minutes for the first 30 minutes after you posted it, then every 60 minutes. The
+     CEO's answer wakes you at once, so a longer rest does not delay the work.
+   - Blocked on another agent, or only waiting for answers: about 60 minutes.
+   - Lead after the project delivery: every 4 hours until the CEO decides.
+   - Nothing left that you can do and nothing open: end the loop. Delivered: end the loop.
 6. Schedule your next check so it survives: an idle session can be shut down, and a wait inside
    the session is then lost. At the end of every iteration, call the `send_later` tool of the
    Claude Code Remote connector (ToolSearch `select:mcp__claude-code-remote__send_later`) with
@@ -246,6 +249,17 @@ Colors go inline in `colors`. Never put secrets in items.
 ## 7. Lead agent
 
 Phase planning (you are the lead and the project is in `planning`):
+0. Size the work by the project's `size`:
+   - `quick` (a fix or small change): no plan card. Make one or two tasks with checks, set the
+     project `phase: building` and start; post one status saying what you are doing.
+   - `feature` (the default): the steps below, with a short plan (max 5 bullets).
+   - `product` (a new product): first `docs/BRIEF.md` (problem, users, success measures), then
+     `docs/SPEC.md` (features with acceptance criteria, out of scope), then
+     `docs/ARCHITECTURE.md`, then the tasks; run a planning session (section 10) before the
+     plan card, and include its options in the card.
+   Before posting any plan card, run the plan checklist: every scope entry has tasks, every task
+   has acceptance criteria a test can prove, risks are named, nothing needs an account the CEO
+   has not connected.
 1. Read the project's `brief` and the `lessons` collection (past projects' lessons).
    Write `docs/PLAN.md` in the repo: goal, epics, out of scope.
    Key facts missing? One batched question with recommendations; keep planning meanwhile.
@@ -416,3 +430,25 @@ Retrospective (after the project delivery, keep it short):
 - Approved: the fixes become tasks with the usual checks. Medium and low findings that were not
   approved go to the ideas backlog in one `idea` item per area.
 
+## 10. Team sessions
+
+The CEO starts these from the project card. They run as a round table: one pass per viewpoint,
+each as a fresh subagent (Agent tool) that reads the material from scratch, so the viewpoints do
+not copy each other. Then you, the lead, merge them.
+
+- **Planning session.** Viewpoints: product (users, value, what to leave out), architecture
+  (stack, data, risks), design (screens, flows, accessibility) and security (data, accounts,
+  abuse). Each gives its recommendation and its main risk. Post the plan card with up to 3
+  options in the bullets, the one you recommend, and why.
+- **Team review.** Of the latest delivery, design or preview. Viewpoints: product (does it do
+  what the brief asked), design (clarity, mobile, accessibility), security and QA (try to break
+  it). Post ONE approval card: the combined verdict, the fixes you recommend (they become tasks
+  after approval) and anything the viewpoints disagreed on. Screenshots for anything visual.
+- **Sharpen my brief.** Post ONE question card with 5 to 8 numbered questions that close the
+  biggest gaps in the brief (users, edge cases, out of scope, success, deadline, accounts), each
+  with your recommended answer. After the answer, rewrite `brief` on the project doc and
+  `docs/BRIEF.md`, and post the new version in a status card. Existing tasks change only through
+  a scope-change approval.
+- **Retro.** After each finished epic, post a short status "Retro: <epic>" (what worked, what to
+  change, max 5 bullets) and apply it to the next epic's tasks; add the lasting lessons to
+  `lessons/<project>`.

@@ -82,6 +82,19 @@ document.addEventListener('click', async (e) => {
     t.disabled = false;
     return;
   }
+  if (t.dataset.team && db) {
+    const project = t.dataset.project;
+    const ask = {
+      plan: ['Planning session', 'Run a planning session (protocol section 10): a round table of product, architecture, design and security viewpoints on the brief, then post the plan card with the options weighed and why you chose one.'],
+      review: ['Team review', 'Run a team review (protocol section 10) of the latest delivery, design or preview: product, design, security and QA viewpoints, then one approval card with the combined verdict and the fixes you recommend.'],
+      brief: ['Sharpen my brief', 'Sharpen the brief (protocol section 10): post ONE question card with 5 to 8 numbered questions about users, edge cases, scope and success, each with your recommended answer. After the answer, rewrite the brief and show the new version in a status card.'],
+    }[t.dataset.team];
+    t.disabled = true;
+    try { const to = await directProject(project, 'lead', ask[1]); projectMsg(project, `${ask[0]} requested from ${to}.`); }
+    catch (x) { projectMsg(project, x.message || 'Could not send. Try again.'); }
+    t.disabled = false;
+    return;
+  }
   if (t.dataset.runAudit && db) {
     const project = t.dataset.runAudit;
     t.disabled = true;
@@ -115,6 +128,7 @@ document.addEventListener('click', async (e) => {
     return;
   }
   if (t.dataset.ptab !== undefined) { curProject = t.dataset.ptab; saveProjectChoice(curProject); render(); return; }
+  if (t.dataset.nudge) { const n = t.dataset.nudge; nudged[n] = true; render(); await wakeAgent(n); return; }
   if (t.id === 'flt-clear') { filters = { agent: '', project: '', type: '' }; saveFilters(); render(); return; }
   if (t.id === 'add-another') { document.getElementById('add-result').hidden = true; const f = document.getElementById('add-form'); f.reset(); f.hidden = false; return; }
   if (t.id === 'prune' && db) {

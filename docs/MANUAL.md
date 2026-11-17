@@ -25,6 +25,16 @@ every part of it.
 
 ## What's new
 
+- **Problems view:** every agent shows one state in plain words (working, waiting on you,
+  resting until a time, stalled, done), with a summary line above the list and a **Nudge**
+  button for stalled agents.
+- **Team buttons on each project:** **Planning session** (a round table of product,
+  architecture, design and security viewpoints before the plan), **Team review** (several
+  viewpoints review the latest delivery, design or preview and give one verdict) and **Sharpen my
+  brief** (5 to 8 sharp questions, then a rewritten brief).
+- **Right-sized projects:** in Add project, pick Quick fix (straight to build), Feature (a short
+  plan) or New product (brief, product spec, architecture, then tasks).
+- **Agents rest while they wait for you,** and your answer wakes them, so waiting costs less.
 - **One hub per project:** each project gets its own hub page, so cards never mix. **Add project**
   in a hub that already has a project gives you a request to paste into Claude Code, which
   creates the new hub (see `docs/NEW-PROJECT.md`). Messages that read like a new build request

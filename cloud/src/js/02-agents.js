@@ -17,6 +17,7 @@ const startErr = {};
 
 // ---------- usage limits ----------
 let triggerOn = false;
+const nudged = {}; // agent -> true after the CEO pressed Nudge
 const hhmm = (iso) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 function isLimited(a) {
   const l = a && a.limit;
@@ -141,6 +142,8 @@ function writeBrief() {
   if (out) lines.push(`Out of scope for now: ${out}`);
   if (deadline) lines.push(`Deadline: ${deadline}`);
   if (where) lines.push(`Runs on: ${where}`);
+  const size = document.getElementById('f-size').value;
+  if (size) lines.push(`Size: ${{ quick: 'quick fix', feature: 'feature', product: 'new product' }[size] || size}`);
   const kind = document.getElementById('f-kind').value;
   if (kind && kind !== 'other') lines.push(`Type: ${KIND_LABEL[kind]} (the lead uses the ${KIND_LABEL[kind]} starter checklist)`);
   const brief = document.getElementById('f-brief');
@@ -194,27 +197,52 @@ async function fillEnvPicker() {
   } catch (e) { const l = sel.closest('label'); if (l) l.hidden = true; }
 }
 
+// One plain-words state per agent, for the problems view.
+function agentState(a, waitingOnYou) {
+  if (a.state === 'stopped') return { key: 'stopped', label: 'Stopped' };
+  if (a.state === 'delivered' && !(Date.now() - ms(a.last_seen) < STALE_MIN * 60000)) return { key: 'done', label: 'Done' };
+  if (neverCheckedIn(a)) return { key: 'stalled', label: 'Never started' };
+  if (isAsleep(a)) return { key: 'stalled', label: 'Stalled' };
+  if (isLimited(a)) return { key: 'stalled', label: 'Usage limit' };
+  if (waitingOnYou) return { key: 'you', label: 'Waiting on you' };
+  if (!a.last_seen && !a.started_at) return { key: 'idle', label: 'Not started' };
+  if (Date.now() - ms(a.last_seen) < STALE_MIN * 60000) return { key: 'working', label: 'Working' };
+  if (a.next_check_at && ms(a.next_check_at) > Date.now()) return { key: 'resting', label: `Resting until ${hhmm(a.next_check_at)}` };
+  return { key: 'idle', label: 'Idle' };
+}
+
 function renderAgents() {
   const el = document.getElementById('agents');
   document.getElementById('agents-count').textContent = S.agents.length ? `${S.agents.filter(isRunning).length} of ${S.agents.length} running` : '';
   if (!S.agents.length) return;
   const openBy = new Set(S.items.filter((i) => i.needs_me && i.status === 'open').map((i) => i.agent));
+  // Summary line: problems first, so a stalled agent is visible at a glance.
+  const counts = {};
+  for (const a of S.agents) { const k = agentState(a, openBy.has(a.agent)).key; counts[k] = (counts[k] || 0) + 1; }
+  const order = [['stalled', 'stalled'], ['you', 'waiting on you'], ['working', 'working'], ['resting', 'resting'], ['idle', 'idle'], ['stopped', 'stopped'], ['done', 'done']];
+  const summary = order.filter(([k]) => counts[k]).map(([k, l]) => `<span class="st st-${k}">${counts[k]} ${l}</span>`).join('');
+  const sumEl = document.getElementById('agents-summary');
+  if (sumEl) sumEl.innerHTML = summary;
   el.innerHTML = S.agents.slice().sort((a, b) => String(a.agent).localeCompare(String(b.agent))).map((a) => {
     const running = isRunning(a);
     const waiting = openBy.has(a.agent);
     const when = running ? ago(a.last_seen) : ms(a.last_seen) ? `idle, ${ago(a.last_seen)}` : 'not started';
     const sub = `${esc(a.project || '')}${a.role ? ` · ${esc(a.role)}` : ''}${a.current_task ? ` · ${esc(a.current_task)}` : ''}`;
     const pending = S.unread.filter((x) => x.agent === a.agent).length;
-    const third = waiting ? '<p class="waiting-text">Waiting on you</p>'
+    const third = waiting ? ''
       : pending ? `<p>${pending} answer${pending === 1 ? '' : 's'} not picked up yet</p>`
       : a.state === 'delivered' && !running ? '<p>Delivered</p>'
       : a.last_status_title ? `<p title="${esc(a.last_status_title)}">${esc(a.last_status_title)}</p>` : '';
     const open = Object.prototype.hasOwnProperty.call(msgDrafts, a.agent);
-    return `<div class="agent">
+    const st = agentState(a, waiting);
+    const nudge = st.key === 'stalled' && !isLimited(a) && a.session_id && triggerOn && mcp
+      ? `<div class="agent-links">${nudged[a.agent] ? '<span class="hint" role="status">Nudged</span>' : `<button class="link" data-nudge="${esc(a.agent)}">Nudge</button>`}</div>` : '';
+    return `<div class="agent st-row-${st.key}">
       <div class="agent-top"><span class="dot${waiting ? ' waiting' : running ? ' running' : ''}" aria-hidden="true"></span>
         <button class="agent-name" data-filter-agent="${esc(a.agent)}" title="Show only this agent">${esc(a.agent)}</button>
         <span class="agent-when">${when}</span></div>
-      <p>${sub}</p>${third}
+      <p><span class="st st-${st.key}">${esc(st.label)}</span> ${sub}</p>${third}
+      ${nudge}
       ${cloudHtml(a, running)}
       ${open ? `<div class="row"><input type="text" id="msg-${esc(slug(a.agent))}" data-msg-input="${esc(a.agent)}" value="${esc(msgDrafts[a.agent])}" placeholder="Message to ${esc(a.agent)}" maxlength="500"><button class="btn primary" data-msg-send="${esc(a.agent)}">${msgOffer[a.agent] ? 'Send anyway' : 'Send'}</button></div>${msgOffer[a.agent] ? `<p class="hint" data-pending="${esc(msgOffer[a.agent])}">This reads like a new project. <button type="button" class="link" data-new-project="1">Start it as a new project</button></p>` : ''}`
         : `<div><button class="link" data-msg-open="${esc(a.agent)}">Message</button></div>`}

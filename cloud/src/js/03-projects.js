@@ -189,7 +189,12 @@ function renderProjects() {
         </div>
       </details>
       ${profilesHtml(p)}
-      <div class="row"><button type="button" class="btn" data-run-audit="${esc(p.name)}">Run code audit</button></div>
+      <div class="team-actions">
+        <button type="button" class="btn" data-team="plan" data-project="${esc(p.name)}" title="The lead runs a round table with product, architecture, design and security viewpoints, then posts the plan with the options weighed">Planning session</button>
+        <button type="button" class="btn" data-team="review" data-project="${esc(p.name)}" title="Product, design, security and QA viewpoints review the latest delivery, design or preview and post one combined verdict">Team review</button>
+        <button type="button" class="btn" data-team="brief" data-project="${esc(p.name)}" title="The lead asks you 5 to 8 sharp questions, then rewrites the brief">Sharpen my brief</button>
+        <button type="button" class="btn" data-run-audit="${esc(p.name)}">Run code audit</button>
+      </div>
       <p class="hint" id="pmsg-${esc(p.name)}" hidden></p>
     </div>`;
   }).join('');

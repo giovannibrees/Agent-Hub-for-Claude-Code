@@ -493,6 +493,20 @@ textarea { width: 100%; resize: vertical; line-height: 1.5; }
 .agent .link:hover, .agent-links a:hover { border-color: var(--accent); color: var(--accent); text-decoration: none; }
 .agent .row { margin-top: 6px; }
 
+.team-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.team-actions .btn { padding: 6px 12px; font-size: 15px; }
+
+/* Problems view: one state per agent */
+.st-summary { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
+.st-summary:empty { display: none; }
+.st { display: inline-block; font: 600 13px/1 var(--sans); padding: 4px 8px; border-radius: 999px; background: var(--sunk); color: var(--muted); white-space: nowrap; }
+.agent p .st { margin-right: 4px; }
+.st-working { background: var(--ok-tint); color: var(--ok); }
+.st-you { background: var(--attn-tint); color: var(--attn); }
+.st-stalled { background: var(--error); color: #fff; }
+.st-resting { background: var(--accent-tint); color: var(--accent); }
+.agent.st-row-stalled { background: color-mix(in srgb, var(--error) 7%, transparent); }
+
 /* Rail: projects */
 .project { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; display: grid; gap: 10px; min-width: 0; box-shadow: var(--shadow); }
 .project-top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 10px; align-items: baseline; }
@@ -608,6 +622,11 @@ textarea { width: 100%; resize: vertical; line-height: 1.5; }
         <option value="tool">Internal tool for my team</option>
         <option value="other" selected>Something else, or a change to an existing app</option>
       </select></label>
+      <label for="f-size">How big is it? <select id="f-size">
+        <option value="quick">Quick fix: straight to build, no plan card</option>
+        <option value="feature" selected>Feature: a short plan for you to approve</option>
+        <option value="product">New product: brief, product spec, architecture, then tasks</option>
+      </select></label>
       <label for="f-live">Live URL, where it runs for real (optional) <input type="text" id="f-live" placeholder="yourapp.com, or leave empty for a new app"></label>
       <label for="f-repo" class="full">GitHub repo or folder (optional) <input type="text" id="f-repo" placeholder="github.com/you/gym-app or /Users/you/Projects/gym-app"></label>
       <details class="full brief-help" id="brief-help"><summary>Help me write the brief</summary>
@@ -685,6 +704,7 @@ textarea { width: 100%; resize: vertical; line-height: 1.5; }
     <aside class="rail">
       <section class="block" id="agents-block">
         <h2>Agents <span class="count" id="agents-count"></span></h2>
+        <p class="st-summary" id="agents-summary"></p>
         <div id="agents" class="crew"><p class="empty">No agents yet. Add a project, then start its agents with the lines it gives you.</p></div>
       </section>
       <section class="block" id="projects-block" hidden>
@@ -800,6 +820,7 @@ const startErr = {};
 
 // ---------- usage limits ----------
 let triggerOn = false;
+const nudged = {}; // agent -> true after the CEO pressed Nudge
 const hhmm = (iso) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 function isLimited(a) {
   const l = a && a.limit;
@@ -924,6 +945,8 @@ function writeBrief() {
   if (out) lines.push(`Out of scope for now: ${out}`);
   if (deadline) lines.push(`Deadline: ${deadline}`);
   if (where) lines.push(`Runs on: ${where}`);
+  const size = document.getElementById('f-size').value;
+  if (size) lines.push(`Size: ${{ quick: 'quick fix', feature: 'feature', product: 'new product' }[size] || size}`);
   const kind = document.getElementById('f-kind').value;
   if (kind && kind !== 'other') lines.push(`Type: ${KIND_LABEL[kind]} (the lead uses the ${KIND_LABEL[kind]} starter checklist)`);
   const brief = document.getElementById('f-brief');
@@ -977,27 +1000,52 @@ async function fillEnvPicker() {
   } catch (e) { const l = sel.closest('label'); if (l) l.hidden = true; }
 }
 
+// One plain-words state per agent, for the problems view.
+function agentState(a, waitingOnYou) {
+  if (a.state === 'stopped') return { key: 'stopped', label: 'Stopped' };
+  if (a.state === 'delivered' && !(Date.now() - ms(a.last_seen) < STALE_MIN * 60000)) return { key: 'done', label: 'Done' };
+  if (neverCheckedIn(a)) return { key: 'stalled', label: 'Never started' };
+  if (isAsleep(a)) return { key: 'stalled', label: 'Stalled' };
+  if (isLimited(a)) return { key: 'stalled', label: 'Usage limit' };
+  if (waitingOnYou) return { key: 'you', label: 'Waiting on you' };
+  if (!a.last_seen && !a.started_at) return { key: 'idle', label: 'Not started' };
+  if (Date.now() - ms(a.last_seen) < STALE_MIN * 60000) return { key: 'working', label: 'Working' };
+  if (a.next_check_at && ms(a.next_check_at) > Date.now()) return { key: 'resting', label: `Resting until ${hhmm(a.next_check_at)}` };
+  return { key: 'idle', label: 'Idle' };
+}
+
 function renderAgents() {
   const el = document.getElementById('agents');
   document.getElementById('agents-count').textContent = S.agents.length ? `${S.agents.filter(isRunning).length} of ${S.agents.length} running` : '';
   if (!S.agents.length) return;
   const openBy = new Set(S.items.filter((i) => i.needs_me && i.status === 'open').map((i) => i.agent));
+  // Summary line: problems first, so a stalled agent is visible at a glance.
+  const counts = {};
+  for (const a of S.agents) { const k = agentState(a, openBy.has(a.agent)).key; counts[k] = (counts[k] || 0) + 1; }
+  const order = [['stalled', 'stalled'], ['you', 'waiting on you'], ['working', 'working'], ['resting', 'resting'], ['idle', 'idle'], ['stopped', 'stopped'], ['done', 'done']];
+  const summary = order.filter(([k]) => counts[k]).map(([k, l]) => `<span class="st st-${k}">${counts[k]} ${l}</span>`).join('');
+  const sumEl = document.getElementById('agents-summary');
+  if (sumEl) sumEl.innerHTML = summary;
   el.innerHTML = S.agents.slice().sort((a, b) => String(a.agent).localeCompare(String(b.agent))).map((a) => {
     const running = isRunning(a);
     const waiting = openBy.has(a.agent);
     const when = running ? ago(a.last_seen) : ms(a.last_seen) ? `idle, ${ago(a.last_seen)}` : 'not started';
     const sub = `${esc(a.project || '')}${a.role ? ` · ${esc(a.role)}` : ''}${a.current_task ? ` · ${esc(a.current_task)}` : ''}`;
     const pending = S.unread.filter((x) => x.agent === a.agent).length;
-    const third = waiting ? '<p class="waiting-text">Waiting on you</p>'
+    const third = waiting ? ''
       : pending ? `<p>${pending} answer${pending === 1 ? '' : 's'} not picked up yet</p>`
       : a.state === 'delivered' && !running ? '<p>Delivered</p>'
       : a.last_status_title ? `<p title="${esc(a.last_status_title)}">${esc(a.last_status_title)}</p>` : '';
     const open = Object.prototype.hasOwnProperty.call(msgDrafts, a.agent);
-    return `<div class="agent">
+    const st = agentState(a, waiting);
+    const nudge = st.key === 'stalled' && !isLimited(a) && a.session_id && triggerOn && mcp
+      ? `<div class="agent-links">${nudged[a.agent] ? '<span class="hint" role="status">Nudged</span>' : `<button class="link" data-nudge="${esc(a.agent)}">Nudge</button>`}</div>` : '';
+    return `<div class="agent st-row-${st.key}">
       <div class="agent-top"><span class="dot${waiting ? ' waiting' : running ? ' running' : ''}" aria-hidden="true"></span>
         <button class="agent-name" data-filter-agent="${esc(a.agent)}" title="Show only this agent">${esc(a.agent)}</button>
         <span class="agent-when">${when}</span></div>
-      <p>${sub}</p>${third}
+      <p><span class="st st-${st.key}">${esc(st.label)}</span> ${sub}</p>${third}
+      ${nudge}
       ${cloudHtml(a, running)}
       ${open ? `<div class="row"><input type="text" id="msg-${esc(slug(a.agent))}" data-msg-input="${esc(a.agent)}" value="${esc(msgDrafts[a.agent])}" placeholder="Message to ${esc(a.agent)}" maxlength="500"><button class="btn primary" data-msg-send="${esc(a.agent)}">${msgOffer[a.agent] ? 'Send anyway' : 'Send'}</button></div>${msgOffer[a.agent] ? `<p class="hint" data-pending="${esc(msgOffer[a.agent])}">This reads like a new project. <button type="button" class="link" data-new-project="1">Start it as a new project</button></p>` : ''}`
         : `<div><button class="link" data-msg-open="${esc(a.agent)}">Message</button></div>`}
@@ -1196,7 +1244,12 @@ function renderProjects() {
         </div>
       </details>
       ${profilesHtml(p)}
-      <div class="row"><button type="button" class="btn" data-run-audit="${esc(p.name)}">Run code audit</button></div>
+      <div class="team-actions">
+        <button type="button" class="btn" data-team="plan" data-project="${esc(p.name)}" title="The lead runs a round table with product, architecture, design and security viewpoints, then posts the plan with the options weighed">Planning session</button>
+        <button type="button" class="btn" data-team="review" data-project="${esc(p.name)}" title="Product, design, security and QA viewpoints review the latest delivery, design or preview and post one combined verdict">Team review</button>
+        <button type="button" class="btn" data-team="brief" data-project="${esc(p.name)}" title="The lead asks you 5 to 8 sharp questions, then rewrites the brief">Sharpen my brief</button>
+        <button type="button" class="btn" data-run-audit="${esc(p.name)}">Run code audit</button>
+      </div>
       <p class="hint" id="pmsg-${esc(p.name)}" hidden></p>
     </div>`;
   }).join('');
@@ -1672,7 +1725,7 @@ async function checkPerms() {
 function newHubRequest(p) {
   return [`Create a new Agent Hub for a new project, following docs/NEW-PROJECT.md in github.com/giovannibrees/Agent-Hub-for-Claude-Code.`,
     `Copy the hub rules (config: protocol, roles, alerts, alert-relay) and the lessons from ${HUB_URL}.`,
-    `Project: ${p.name}`, `Team: ${p.agents}`, `Type: ${p.kind}`, `Live URL: ${p.live || 'none yet'}`, `Repo: ${p.repo || 'none yet'}`, `Priority: ${p.priority}`,
+    `Project: ${p.name}`, `Team: ${p.agents}`, `Type: ${p.kind}`, `Size: ${p.size}`, `Live URL: ${p.live || 'none yet'}`, `Repo: ${p.repo || 'none yet'}`, `Priority: ${p.priority}`,
     `Brief:`, p.brief].join('\n');
 }
 const msgOffer = {}; // agent -> message text that read like a new project
@@ -1709,6 +1762,7 @@ document.getElementById('add-form').addEventListener('submit', async (e) => {
   const brief = clean(document.getElementById('f-brief').value).trim();
   const repo = document.getElementById('f-repo').value.trim();
   const kind = document.getElementById('f-kind').value;
+  const size = document.getElementById('f-size').value;
   const liveUrl = document.getElementById('f-live').value.trim();
   // Agent names are unique across projects: "lead" in project gym-app becomes "lead-gym-app".
   const agents = document.getElementById('f-agents').value.split(',').map((s) => slug(s)).filter(Boolean)
@@ -1720,7 +1774,7 @@ document.getElementById('add-form').addEventListener('submit', async (e) => {
   // publishes a fresh hub page for it (docs/NEW-PROJECT.md).
   const single = window.HUB_SINGLE_PROJECT !== undefined ? window.HUB_SINGLE_PROJECT : !window.HUB_DEMO;
   if (single && S.projects.length) {
-    const req = newHubRequest({ name, agents: document.getElementById('f-agents').value, kind: document.getElementById('f-kind').value,
+    const req = newHubRequest({ name, agents: document.getElementById('f-agents').value, kind: document.getElementById('f-kind').value, size: document.getElementById('f-size').value,
       live: document.getElementById('f-live').value.trim(), repo, priority: document.getElementById('f-priority').value, brief });
     const out = document.getElementById('add-result');
     out.innerHTML = `<h3>${esc(name)} gets its own hub</h3>
@@ -1734,7 +1788,7 @@ document.getElementById('add-form').addEventListener('submit', async (e) => {
   btn.disabled = true;
   try {
     const now = new Date().toISOString();
-    await db.doc(`projects/${name}`).set({ name, goal: brief.split('\n')[0].replace(/^#+\s*/, '').slice(0, 160), brief, repo, kind, live_url: liveUrl, phase: 'planning', priority: document.getElementById('f-priority').value,
+    await db.doc(`projects/${name}`).set({ name, goal: brief.split('\n')[0].replace(/^#+\s*/, '').slice(0, 160), brief, repo, kind, size, live_url: liveUrl, phase: 'planning', priority: document.getElementById('f-priority').value,
       scope: [], never: [], lead: agents.find((a) => role(a) === 'lead') || '', agents: agents.map((a) => ({ name: a, role: role(a) })), created_at: now });
     for (const a of agents) await db.doc(`agents/${a}`).set({ agent: a, project: name, role: role(a), registered_at: now, state: 'registered' });
     const out = document.getElementById('add-result');
@@ -1844,6 +1898,19 @@ document.addEventListener('click', async (e) => {
     t.disabled = false;
     return;
   }
+  if (t.dataset.team && db) {
+    const project = t.dataset.project;
+    const ask = {
+      plan: ['Planning session', 'Run a planning session (protocol section 10): a round table of product, architecture, design and security viewpoints on the brief, then post the plan card with the options weighed and why you chose one.'],
+      review: ['Team review', 'Run a team review (protocol section 10) of the latest delivery, design or preview: product, design, security and QA viewpoints, then one approval card with the combined verdict and the fixes you recommend.'],
+      brief: ['Sharpen my brief', 'Sharpen the brief (protocol section 10): post ONE question card with 5 to 8 numbered questions about users, edge cases, scope and success, each with your recommended answer. After the answer, rewrite the brief and show the new version in a status card.'],
+    }[t.dataset.team];
+    t.disabled = true;
+    try { const to = await directProject(project, 'lead', ask[1]); projectMsg(project, `${ask[0]} requested from ${to}.`); }
+    catch (x) { projectMsg(project, x.message || 'Could not send. Try again.'); }
+    t.disabled = false;
+    return;
+  }
   if (t.dataset.runAudit && db) {
     const project = t.dataset.runAudit;
     t.disabled = true;
@@ -1877,6 +1944,7 @@ document.addEventListener('click', async (e) => {
     return;
   }
   if (t.dataset.ptab !== undefined) { curProject = t.dataset.ptab; saveProjectChoice(curProject); render(); return; }
+  if (t.dataset.nudge) { const n = t.dataset.nudge; nudged[n] = true; render(); await wakeAgent(n); return; }
   if (t.id === 'flt-clear') { filters = { agent: '', project: '', type: '' }; saveFilters(); render(); return; }
   if (t.id === 'add-another') { document.getElementById('add-result').hidden = true; const f = document.getElementById('add-form'); f.reset(); f.hidden = false; return; }
   if (t.id === 'prune' && db) {

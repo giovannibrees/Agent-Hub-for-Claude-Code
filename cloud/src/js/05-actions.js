@@ -152,7 +152,7 @@ async function checkPerms() {
 function newHubRequest(p) {
   return [`Create a new Agent Hub for a new project, following docs/NEW-PROJECT.md in github.com/giovannibrees/Agent-Hub-for-Claude-Code.`,
     `Copy the hub rules (config: protocol, roles, alerts, alert-relay) and the lessons from ${HUB_URL}.`,
-    `Project: ${p.name}`, `Team: ${p.agents}`, `Type: ${p.kind}`, `Live URL: ${p.live || 'none yet'}`, `Repo: ${p.repo || 'none yet'}`, `Priority: ${p.priority}`,
+    `Project: ${p.name}`, `Team: ${p.agents}`, `Type: ${p.kind}`, `Size: ${p.size}`, `Live URL: ${p.live || 'none yet'}`, `Repo: ${p.repo || 'none yet'}`, `Priority: ${p.priority}`,
     `Brief:`, p.brief].join('\n');
 }
 const msgOffer = {}; // agent -> message text that read like a new project
@@ -189,6 +189,7 @@ document.getElementById('add-form').addEventListener('submit', async (e) => {
   const brief = clean(document.getElementById('f-brief').value).trim();
   const repo = document.getElementById('f-repo').value.trim();
   const kind = document.getElementById('f-kind').value;
+  const size = document.getElementById('f-size').value;
   const liveUrl = document.getElementById('f-live').value.trim();
   // Agent names are unique across projects: "lead" in project gym-app becomes "lead-gym-app".
   const agents = document.getElementById('f-agents').value.split(',').map((s) => slug(s)).filter(Boolean)
@@ -200,7 +201,7 @@ document.getElementById('add-form').addEventListener('submit', async (e) => {
   // publishes a fresh hub page for it (docs/NEW-PROJECT.md).
   const single = window.HUB_SINGLE_PROJECT !== undefined ? window.HUB_SINGLE_PROJECT : !window.HUB_DEMO;
   if (single && S.projects.length) {
-    const req = newHubRequest({ name, agents: document.getElementById('f-agents').value, kind: document.getElementById('f-kind').value,
+    const req = newHubRequest({ name, agents: document.getElementById('f-agents').value, kind: document.getElementById('f-kind').value, size: document.getElementById('f-size').value,
       live: document.getElementById('f-live').value.trim(), repo, priority: document.getElementById('f-priority').value, brief });
     const out = document.getElementById('add-result');
     out.innerHTML = `<h3>${esc(name)} gets its own hub</h3>
@@ -214,7 +215,7 @@ document.getElementById('add-form').addEventListener('submit', async (e) => {
   btn.disabled = true;
   try {
     const now = new Date().toISOString();
-    await db.doc(`projects/${name}`).set({ name, goal: brief.split('\n')[0].replace(/^#+\s*/, '').slice(0, 160), brief, repo, kind, live_url: liveUrl, phase: 'planning', priority: document.getElementById('f-priority').value,
+    await db.doc(`projects/${name}`).set({ name, goal: brief.split('\n')[0].replace(/^#+\s*/, '').slice(0, 160), brief, repo, kind, size, live_url: liveUrl, phase: 'planning', priority: document.getElementById('f-priority').value,
       scope: [], never: [], lead: agents.find((a) => role(a) === 'lead') || '', agents: agents.map((a) => ({ name: a, role: role(a) })), created_at: now });
     for (const a of agents) await db.doc(`agents/${a}`).set({ agent: a, project: name, role: role(a), registered_at: now, state: 'registered' });
     const out = document.getElementById('add-result');

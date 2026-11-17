@@ -52,6 +52,11 @@
         <option value="tool">Internal tool for my team</option>
         <option value="other" selected>Something else, or a change to an existing app</option>
       </select></label>
+      <label for="f-size">How big is it? <select id="f-size">
+        <option value="quick">Quick fix: straight to build, no plan card</option>
+        <option value="feature" selected>Feature: a short plan for you to approve</option>
+        <option value="product">New product: brief, product spec, architecture, then tasks</option>
+      </select></label>
       <label for="f-live">Live URL, where it runs for real (optional) <input type="text" id="f-live" placeholder="yourapp.com, or leave empty for a new app"></label>
       <label for="f-repo" class="full">GitHub repo or folder (optional) <input type="text" id="f-repo" placeholder="github.com/you/gym-app or /Users/you/Projects/gym-app"></label>
       <details class="full brief-help" id="brief-help"><summary>Help me write the brief</summary>
@@ -129,6 +134,7 @@
     <aside class="rail">
       <section class="block" id="agents-block">
         <h2>Agents <span class="count" id="agents-count"></span></h2>
+        <p class="st-summary" id="agents-summary"></p>
         <div id="agents" class="crew"><p class="empty">No agents yet. Add a project, then start its agents with the lines it gives you.</p></div>
       </section>
       <section class="block" id="projects-block" hidden>

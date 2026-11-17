@@ -263,6 +263,20 @@ textarea { width: 100%; resize: vertical; line-height: 1.5; }
 .agent .link:hover, .agent-links a:hover { border-color: var(--accent); color: var(--accent); text-decoration: none; }
 .agent .row { margin-top: 6px; }
 
+.team-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.team-actions .btn { padding: 6px 12px; font-size: 15px; }
+
+/* Problems view: one state per agent */
+.st-summary { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
+.st-summary:empty { display: none; }
+.st { display: inline-block; font: 600 13px/1 var(--sans); padding: 4px 8px; border-radius: 999px; background: var(--sunk); color: var(--muted); white-space: nowrap; }
+.agent p .st { margin-right: 4px; }
+.st-working { background: var(--ok-tint); color: var(--ok); }
+.st-you { background: var(--attn-tint); color: var(--attn); }
+.st-stalled { background: var(--error); color: #fff; }
+.st-resting { background: var(--accent-tint); color: var(--accent); }
+.agent.st-row-stalled { background: color-mix(in srgb, var(--error) 7%, transparent); }
+
 /* Rail: projects */
 .project { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; display: grid; gap: 10px; min-width: 0; box-shadow: var(--shadow); }
 .project-top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 10px; align-items: baseline; }
