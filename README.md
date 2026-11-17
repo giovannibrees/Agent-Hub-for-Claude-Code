@@ -352,7 +352,7 @@ For the next project, click **Add project** again. One hub serves all of them.
 ## Questions
 
 **What does it cost?**
-Running Agent Hub for your own projects is free under the license below. The agents run on your own Claude plan.
+Running and adapting Agent Hub for your own projects is free under the license below. The agents run on your own Claude plan.
 To keep usage down: agents stop when their work is delivered instead of waiting, reviewers wake
 only when there is something to review, and the [team guide](docs/TEAMS.md#keeping-cost-down)
 shows which roles can run on a cheaper model.
@@ -384,10 +384,12 @@ Only you. The page is private on your claude.ai account. Use its Share menu to g
 
 ## License
 
-Source available, all rights reserved. This is not open source.
+Free for your own work, with a commercial license for everything else. This is not open source.
 
-- You may run Agent Hub to manage your own projects, free of charge.
-- Copying, sharing, reselling, using it for client work, offering it as a service or building a
-  competing product needs a written license.
+- **Free:** copy Agent Hub into your own private repo, change it as you like (for example to fit a
+  sensitive in-house system), and run it for your own projects and your team.
+- **Commercial license:** using it for client work, reselling or redistributing it, publishing a
+  changed version publicly, offering it as a hosted or white-label service, or building a
+  competing product.
 
-See [LICENSE](LICENSE). For a commercial license, contact [Giovanni Brees](https://github.com/giovannibrees).
+See [LICENSE](LICENSE). For a commercial license, [contact Giovanni Brees](https://github.com/giovannibrees) for a price.

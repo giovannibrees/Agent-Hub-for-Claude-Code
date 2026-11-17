@@ -1,36 +1,43 @@
-Agent Hub License (source available, all rights reserved)
+Agent Hub License (free internal use, commercial license for everything else)
 
-Copyright (c) 2026 Giovanni Brees. All rights reserved.
+Copyright (c) 2026 Giovanni Brees. All rights reserved except as granted below.
 
-The source code is published so people can read and evaluate it. Publishing it does not make it
-open source and grants no rights except those stated below.
+This is not an open source license. It lets you use and adapt the software for your own work,
+free of charge, and reserves every other use for a separate commercial license.
 
-1. Permitted use. One person or one organization may install and run this software, free of
-   charge, to manage its own projects, and may change it only as far as needed for that own use.
+1. Free internal use. Any person or organization ("you") may, free of charge:
+   - copy the software, including into private repositories you control;
+   - change it in any way, including adapting it to your own systems, security rules and tools;
+   - install and run the original or your changed version to manage your own projects and your
+     own internal work, with your own employees and contractors working on your behalf.
 
-2. Not permitted without a separate written license from the copyright holder:
-   - copying, publishing, redistributing or sharing the software or any substantial part of it,
-     changed or unchanged, in any form, including in another repository, package, template,
-     course or product;
-   - selling, renting, lending or sublicensing it;
-   - using it to deliver work or services to clients or third parties;
+2. Needs a commercial license from the copyright holder:
+   - using the software, or a changed version, to deliver work or services to clients or other
+     third parties, or to manage projects you carry out for them;
+   - selling, renting, lending, sublicensing or otherwise distributing it, changed or unchanged,
+     including as part of a template, package, course or product;
+   - publishing it or a changed version where people outside your organization can access it,
+     such as a public repository;
    - offering it, or anything built from it, as a hosted, managed or white-label service;
-   - using it, its design, its documentation or its agent rules to build a product that competes
-     with it;
-   - removing or changing this license or any copyright notice.
+   - building a product that competes with it from it, its design, its documentation or its agent
+     rules.
 
-3. GitHub. GitHub's Terms of Service let GitHub users view and fork public repositories on
-   GitHub. No other right follows from that, and a fork is covered by this license.
+3. Notices. Keep this license and the copyright notice in every copy and changed version. You
+   may not remove or change them.
 
-4. Feedback. Ideas, changes or reports you send to the copyright holder may be used by the
+4. GitHub. GitHub's Terms of Service let GitHub users view and fork public repositories on
+   GitHub. A fork is covered by this license; forking gives no further rights.
+
+5. Feedback. Ideas, changes or reports you send to the copyright holder may be used by the
    copyright holder for any purpose without obligation to you.
 
-5. Ending. Your permission ends automatically if you break these terms. You must then stop using
-   the software and delete all copies.
+6. Ending. Your permission ends automatically if you break these terms and do not fix the breach
+   within 30 days of notice. You must then stop using the software and delete all copies.
 
-6. No warranty. The software is provided "as is", without warranty of any kind. The copyright
+7. No warranty. The software is provided "as is", without warranty of any kind. The copyright
    holder is not liable for any claim, damages or other liability arising from the software or
-   its use.
+   its use. You are responsible for checking that the software and your changes meet your own
+   security and compliance requirements.
 
-For a license beyond these terms, contact the copyright holder through
-https://github.com/giovannibrees.
+Commercial license: contact the copyright holder through https://github.com/giovannibrees for a
+price.
