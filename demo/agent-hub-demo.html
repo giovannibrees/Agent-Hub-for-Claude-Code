@@ -1362,7 +1362,7 @@ function cardHtml(it, opts) {
     const pend = pendingAct[it.id];
     if (pend) parts.push(`<div class="undo" role="status"><span>${esc(DECISION_LABEL[pend.action] || pend.action)}: sending in a few seconds.</span><button class="btn" data-undo="${esc(it.id)}">Undo</button></div>`);
     else parts.push(`<div class="actions">
-      <button class="btn primary" data-act="approve" data-id="${esc(it.id)}"${off}>Approve</button>
+      ${it.type === 'delivery' ? `<button class="btn primary" data-act="ship" data-id="${esc(it.id)}"${off}>Ship it</button>` : `<button class="btn primary" data-act="approve" data-id="${esc(it.id)}"${off}>Approve</button>`}
       <button class="btn" data-fb-open="${esc(it.id)}"${off}>Feedback</button>
       <button class="btn" data-act="more_info" data-id="${esc(it.id)}"${off}>More info</button>
       <button class="btn" data-act="reject" data-id="${esc(it.id)}"${off}>Not approved</button>
@@ -1385,7 +1385,7 @@ function cardHtml(it, opts) {
     parts.push(`<p class="answer"><strong>${esc(DECISION_LABEL[it.answer.decision] || it.answer.decision)}</strong> ${ago(it.answer.at)}${it.answer.text ? `: ${esc(it.answer.text)}` : ''}${af.length ? ` (${af.length} file${af.length === 1 ? '' : 's'} attached)` : ''}${un ? `<br><span class="hint">Not picked up yet${Date.now() - ms(it.answer.at) > 30 * 60000 ? (roleOf(it.agent || '') === 'lead' ? '. The watchdog wakes the lead within the hour' : '. The lead takes it over on its next check') : ''}.</span>` : ''}</p>`);
   }
   const proj = S.projects.find((p) => p.name === it.project) || {};
-  const shippable = opts.ack && it.type === 'delivery' && it.status === 'open' && !(it.pr && it.pr.merged) && (it.pr || proj.live_url);
+  const shippable = opts.ack && it.type === 'delivery' && it.status === 'open' && !(it.pr && it.pr.merged) && (it.pr || proj.live_url || it.preview_url || arr(it.links).length);
   const shipPend = shippable && pendingAct[it.id];
   if (shipPend) parts.push(`<div class="undo" role="status"><span>Ship it: sending in a few seconds.</span><button class="btn" data-undo="${esc(it.id)}">Undo</button></div>`);
   else if (opts.ack) parts.push(`<div class="actions">${shippable ? `<button class="btn primary" data-act="ship" data-id="${esc(it.id)}">Ship it</button>` : ''}<button class="btn${shippable ? '' : ' primary'}" data-act="acknowledge" data-id="${esc(it.id)}">Acknowledge</button></div>${shippable && proj.live_url ? `<p class="hint">Ship it merges, deploys and checks ${esc(host(proj.live_url))} shows the change.</p>` : ''}`);

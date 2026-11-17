@@ -322,6 +322,20 @@ test('A card replaced by a newer version is hidden, but search still finds it', 
   await p.done();
 });
 
+test('A delivery that needs the CEO offers Ship it instead of Approve', async () => {
+  const p = await open();
+  await p.evaluate(async () => { const db = await window.HUB_DEMO.use('db');
+    await db.doc('items/dl2').set({ id: 'dl2', timestamp: new Date().toISOString(), agent: 'lead-landing-v2', project: 'landing-v2', type: 'delivery',
+      title: 'Landing v2 ready to ship', status: 'open', needs_me: true, preview_url: 'https://preview.example', bullets: ['a', 'b', 'c'] }); });
+  await p.waitForTimeout(400);
+  const c = card(p, 'Landing v2 ready to ship');
+  check(await c.locator('[data-act=ship]').count() === 1 && await c.locator('[data-act=approve]').count() === 0, 'no Ship it on a needs-you delivery');
+  await c.locator('[data-act=ship]').click(); await p.waitForTimeout(600);
+  const a = await dbGet(p, 'answers/dl2');
+  check(a && a.decision === 'ship' && a.agent === 'lead-landing-v2', `bad answer ${JSON.stringify(a)}`);
+  await p.done();
+});
+
 test('Brief helper writes the brief and names what is missing', async () => {
   const p = await open();
   await p.click('#add-toggle'); await p.click('#brief-help summary');
