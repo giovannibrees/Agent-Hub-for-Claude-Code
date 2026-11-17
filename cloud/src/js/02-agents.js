@@ -210,7 +210,7 @@ function renderAgents() {
         <span class="agent-when">${when}</span></div>
       <p>${sub}</p>${third}
       ${cloudHtml(a, running)}
-      ${open ? `<div class="row"><input type="text" id="msg-${esc(slug(a.agent))}" data-msg-input="${esc(a.agent)}" value="${esc(msgDrafts[a.agent])}" placeholder="Message to ${esc(a.agent)}" maxlength="500"><button class="btn primary" data-msg-send="${esc(a.agent)}">Send</button></div>`
+      ${open ? `<div class="row"><input type="text" id="msg-${esc(slug(a.agent))}" data-msg-input="${esc(a.agent)}" value="${esc(msgDrafts[a.agent])}" placeholder="Message to ${esc(a.agent)}" maxlength="500"><button class="btn primary" data-msg-send="${esc(a.agent)}">${msgOffer[a.agent] ? 'Send anyway' : 'Send'}</button></div>${msgOffer[a.agent] ? `<p class="hint" data-pending="${esc(msgOffer[a.agent])}">This reads like a new project. <button type="button" class="link" data-new-project="1">Start it as a new project</button></p>` : ''}`
         : `<div><button class="link" data-msg-open="${esc(a.agent)}">Message</button></div>`}
     </div>`;
   }).join('');

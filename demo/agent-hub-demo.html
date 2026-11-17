@@ -313,6 +313,15 @@ button:focus-visible, input:focus, select:focus, textarea:focus, summary:focus-v
 .tile.hot { background: var(--attn-tint); border-color: color-mix(in srgb, var(--attn) 40%, transparent); }
 .tile.hot b, .tile.hot span { color: var(--attn); }
 
+/* Project tabs */
+.ptabs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+.ptab { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 7px 14px; font-weight: 500; display: inline-flex; align-items: center; gap: 8px; }
+.ptab:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.ptab.on { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+.ptab.done { color: var(--muted); }
+.ptab.on.done { color: var(--bg); }
+.ptab .badge { padding: 3px 8px; }
+
 /* Panels (add project, message all leads) */
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; margin-top: 16px; box-shadow: var(--shadow); }
 .panel h2 { margin-bottom: 14px; }
@@ -565,6 +574,8 @@ textarea { width: 100%; resize: vertical; line-height: 1.5; }
     <button type="button" class="tile" data-jump="ideas-block"><b id="t-ideas">0</b><span>Ideas parked</span></button>
   </nav>
 
+  <nav class="ptabs" id="ptabs" aria-label="Projects" hidden></nav>
+
   <section class="panel" id="bc-panel" hidden>
     <h2>Message all leads</h2>
     <form id="bc-form" class="form">
@@ -709,6 +720,9 @@ function useCap(name) {
   return window.claude && window.claude.use ? window.claude.use(name) : Promise.resolve(null);
 }
 const S = { items: [], agents: [], projects: [], tasks: [], unread: [], personas: [] };
+// Delete buttons armed by a first click (key -> time); a second click within 5 seconds deletes.
+const armed = {};
+const isArmed = (key) => armed[key] && Date.now() - armed[key] < 5000;
 const openDetails = new Set(); // details sections the viewer opened, kept open across re-renders
 const pfDrafts = {};            // customer profile form drafts per project
 const drafts = {};
@@ -977,7 +991,7 @@ function renderAgents() {
         <span class="agent-when">${when}</span></div>
       <p>${sub}</p>${third}
       ${cloudHtml(a, running)}
-      ${open ? `<div class="row"><input type="text" id="msg-${esc(slug(a.agent))}" data-msg-input="${esc(a.agent)}" value="${esc(msgDrafts[a.agent])}" placeholder="Message to ${esc(a.agent)}" maxlength="500"><button class="btn primary" data-msg-send="${esc(a.agent)}">Send</button></div>`
+      ${open ? `<div class="row"><input type="text" id="msg-${esc(slug(a.agent))}" data-msg-input="${esc(a.agent)}" value="${esc(msgDrafts[a.agent])}" placeholder="Message to ${esc(a.agent)}" maxlength="500"><button class="btn primary" data-msg-send="${esc(a.agent)}">${msgOffer[a.agent] ? 'Send anyway' : 'Send'}</button></div>${msgOffer[a.agent] ? `<p class="hint" data-pending="${esc(msgOffer[a.agent])}">This reads like a new project. <button type="button" class="link" data-new-project="1">Start it as a new project</button></p>` : ''}`
         : `<div><button class="link" data-msg-open="${esc(a.agent)}">Message</button></div>`}
     </div>`;
   }).join('');
@@ -994,7 +1008,7 @@ function profilesHtml(p) {
   return `<details id="pers-${esc(p.name)}" data-keep${openDetails.has(`pers-${p.name}`) ? ' open' : ''}><summary>Customer profiles (${list.length})</summary>
     <div class="cards">
       ${list.length ? `<ul class="plist">${list.map((x) => `<li><span>${esc(x.name)}, ${esc(x.age)}, IT ${esc(x.it_skill)}, ${esc(x.device)}${x.needs ? ` · ${esc(x.needs)}` : ''}</span>
-        <span><button type="button" class="link" data-run-test="${esc(p.name)}" data-persona="${esc(x.name)}">Run user test</button> · <button type="button" class="link" data-del-persona="${esc(x.id)}">Remove</button></span></li>`).join('')}</ul>
+        <span><button type="button" class="link" data-run-test="${esc(p.name)}" data-persona="${esc(x.name)}">Run user test</button> · <button type="button" class="link" data-del-persona="${esc(x.id)}">${isArmed(`p:${x.id}`) ? 'Click again to remove' : 'Remove'}</button></span></li>`).join('')}</ul>
         <div><button type="button" class="btn" data-run-test="${esc(p.name)}" data-persona="">Test with all profiles</button></div>` : '<p class="hint">Add the kinds of customers who will use this app. A usertest agent then uses the app as each of them and reports bugs and confusing spots.</p>'}
       <div class="pf">
         <input type="text" id="${esc(id('name'))}" data-pf="${esc(p.name)}" data-field="name" placeholder="Name, e.g. Maria" value="${esc(d.name || '')}" maxlength="40">
@@ -1384,7 +1398,38 @@ function section(id, list, empty, opts) {
   document.getElementById(id).innerHTML = list.length ? list.map((i) => cardHtml(i, opts)).join('') : (empty ? `<p class="empty">${empty}</p>` : '');
 }
 
+// Project tabs: the page shows one project at a time (or all). The choice is remembered per browser.
+let curProject = null;
+function loadProjectChoice() { try { return localStorage.getItem('hub-project'); } catch (e) { return null; } }
+function saveProjectChoice(v) { try { localStorage.setItem('hub-project', v); } catch (e) { /* not kept */ } }
+function pickProject() {
+  const names = S.projects.map((p) => p.name);
+  if (curProject === null) curProject = loadProjectChoice();
+  if (curProject === null || (curProject && !names.includes(curProject))) {
+    const live = S.projects.filter((p) => p.phase !== 'complete' && p.created_at).sort((a, b) => ms(b.created_at) - ms(a.created_at));
+    curProject = names.length > 1 ? ((live[0] || {}).name || '') : '';
+  }
+}
+function renderTabs() {
+  const nav = document.getElementById('ptabs');
+  nav.hidden = S.projects.length < 2;
+  if (nav.hidden) return;
+  const needN = (name) => S.items.filter((i) => i.needs_me && i.status === 'open' && !isSnoozed(i) && (!name || i.project === name)).length;
+  const order = S.projects.slice().sort((a, b) => (a.phase === 'complete') - (b.phase === 'complete') || ms(b.created_at) - ms(a.created_at));
+  const tab = (name, label, extra) => { const n = needN(name); return `<button type="button" class="ptab${curProject === name ? ' on' : ''}${extra || ''}" data-ptab="${esc(name)}" aria-pressed="${curProject === name}">${esc(label)}${n ? ` <span class="badge">${n}</span>` : ''}</button>`; };
+  nav.innerHTML = tab('', 'All projects') + order.map((p) => tab(p.name, p.name, p.phase === 'complete' ? ' done' : '')).join('');
+}
 function render() {
+  pickProject();
+  renderTabs();
+  if (!curProject) return renderView();
+  const keep = { items: S.items, agents: S.agents, projects: S.projects, tasks: S.tasks, unread: S.unread, personas: S.personas };
+  const mine = (x) => (x.project || '') === curProject;
+  S.items = keep.items.filter(mine); S.agents = keep.agents.filter(mine); S.projects = keep.projects.filter((p) => p.name === curProject);
+  S.tasks = keep.tasks.filter(mine); S.unread = keep.unread.filter(mine); S.personas = keep.personas.filter(mine);
+  try { renderView(); } finally { Object.assign(S, keep); }
+}
+function renderView() {
   const a = document.activeElement;
   const focusId = a && a.id && (a.dataset.fbInput || a.dataset.msgInput || a.dataset.pf || a.dataset.budget || a.dataset.search) && a.tagName === 'INPUT' ? a.id : null;
   const caret = focusId ? a.selectionStart : null;
@@ -1444,7 +1489,7 @@ function render() {
     : 'Builds are complete. Review these ideas and turn the ones you want into a new project.';
   section('ideas', ideas, 'No parked ideas.', { idea: true });
   const closedOld = S.items.filter((i) => ['answered', 'acknowledged', 'archived', 'auto_resolved', 'accepted', 'info'].includes(i.status) && Date.now() - ms(i.timestamp) > 30 * 864e5);
-  document.getElementById('maintenance').innerHTML = closedOld.length ? `${closedOld.length} closed items are older than 30 days. <button class="link" id="prune">Delete them</button>` : '';
+  document.getElementById('maintenance').innerHTML = closedOld.length ? `${closedOld.length} closed items are older than 30 days. <button class="link" id="prune">${isArmed('prune') ? 'Click again to delete them for good' : 'Delete them'}</button>` : '';
 
   if (focusId) { const el = document.getElementById(focusId); if (el) { el.focus(); if (caret != null) el.setSelectionRange(caret, caret); } }
   const live = document.getElementById('refreshed'); live.classList.remove('off'); live.textContent = `Live · ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
@@ -1599,9 +1644,18 @@ async function checkPerms() {
   try { if ((await perms.state('db')) === 'denied') showPermBanner(); } catch (e) { /* state never rejects */ }
 }
 
+function newHubRequest(p) {
+  return [`Create a new Agent Hub for a new project, following docs/NEW-PROJECT.md in github.com/giovannibrees/Agent-Hub-for-Claude-Code.`,
+    `Copy the hub rules (config: protocol, roles, alerts, alert-relay) and the lessons from ${HUB_URL}.`,
+    `Project: ${p.name}`, `Team: ${p.agents}`, `Type: ${p.kind}`, `Live URL: ${p.live || 'none yet'}`, `Repo: ${p.repo || 'none yet'}`, `Priority: ${p.priority}`,
+    `Brief:`, p.brief].join('\n');
+}
+const msgOffer = {}; // agent -> message text that read like a new project
 async function sendMessage(agent, btn) {
   const text = clean(msgDrafts[agent] || '').trim();
   if (!text || !db) return;
+  if (looksLikeProject(text) && msgOffer[agent] !== text) { msgOffer[agent] = text; render(); return; }
+  delete msgOffer[agent];
   btn.disabled = true;
   try {
     const ag = S.agents.find((a) => a.agent === agent) || {};
@@ -1637,6 +1691,20 @@ document.getElementById('add-form').addEventListener('submit', async (e) => {
   if (!name || !brief || !agents.length) { err.textContent = 'Give the project a name, at least one agent and a brief.'; err.hidden = false; return; }
   if (S.projects.some((p) => p.name === name)) { err.textContent = `A project called ${name} already exists. Pick another name.`; err.hidden = false; return; }
   const role = roleOf;
+  // One project per hub: a hub that already has a project hands the new one to Claude, which
+  // publishes a fresh hub page for it (docs/NEW-PROJECT.md).
+  const single = window.HUB_SINGLE_PROJECT !== undefined ? window.HUB_SINGLE_PROJECT : !window.HUB_DEMO;
+  if (single && S.projects.length) {
+    const req = newHubRequest({ name, agents: document.getElementById('f-agents').value, kind: document.getElementById('f-kind').value,
+      live: document.getElementById('f-live').value.trim(), repo, priority: document.getElementById('f-priority').value, brief });
+    const out = document.getElementById('add-result');
+    out.innerHTML = `<h3>${esc(name)} gets its own hub</h3>
+      <p class="note">Each project has its own hub page, so its cards never mix with other projects. Paste this request into Claude Code (any session): it creates the hub, copies your rules and lessons, and starts the agents. You get the new link back.</p>
+      <div class="cmd"><code>${esc(req)}</code><button type="button" class="btn primary" data-copy="${esc(req)}">Copy request</button></div>
+      <button type="button" class="link" id="add-another">Back to the form</button>`;
+    out.hidden = false; document.getElementById('add-form').hidden = true;
+    return;
+  }
   const btn = document.getElementById('f-submit');
   btn.disabled = true;
   try {
@@ -1666,6 +1734,15 @@ document.getElementById('add-form').addEventListener('submit', async (e) => {
   }
   btn.disabled = false;
 });
+
+// Deleting needs a second click within 5 seconds; the first click only arms the button.
+function armDelete(btn, label) {
+  const key = btn.dataset.delPersona ? `p:${btn.dataset.delPersona}` : btn.id;
+  if (isArmed(key)) { delete armed[key]; return true; }
+  armed[key] = Date.now(); btn.textContent = label;
+  setTimeout(() => { if (armed[key] && !isArmed(key)) { delete armed[key]; render(); } }, 5100);
+  return false;
+}
 
 document.addEventListener('click', async (e) => {
   const t = e.target.closest('button');
@@ -1728,7 +1805,9 @@ document.addEventListener('click', async (e) => {
     } catch (x) { pfDrafts[project] = d; render(); projectMsg(project, 'Could not save the profile. Try again.'); }
     return;
   }
-  if (t.dataset.delPersona && db) { try { await db.doc(`personas/${t.dataset.delPersona}`).delete(); } catch (x) { /* stays listed */ } return; }
+  if (t.dataset.delPersona && db) {
+    if (!armDelete(t, 'Click again to remove')) return;
+    try { await db.doc(`personas/${t.dataset.delPersona}`).delete(); } catch (x) { /* stays listed */ } return; }
   if (t.dataset.runTest && db) {
     const project = t.dataset.runTest;
     const who = t.dataset.persona;
@@ -1772,9 +1851,11 @@ document.addEventListener('click', async (e) => {
     } catch (x) { banner.textContent = 'Your answers cannot be saved. Open this page\'s Permissions menu on claude.ai, allow its database, then reload.'; }
     return;
   }
+  if (t.dataset.ptab !== undefined) { curProject = t.dataset.ptab; saveProjectChoice(curProject); render(); return; }
   if (t.id === 'flt-clear') { filters = { agent: '', project: '', type: '' }; saveFilters(); render(); return; }
   if (t.id === 'add-another') { document.getElementById('add-result').hidden = true; const f = document.getElementById('add-form'); f.reset(); f.hidden = false; return; }
   if (t.id === 'prune' && db) {
+    if (!armDelete(t, 'Click again to delete them for good')) return;
     t.disabled = true;
     const old = S.items.filter((i) => ['answered', 'acknowledged', 'archived', 'auto_resolved', 'accepted', 'info'].includes(i.status) && Date.now() - ms(i.timestamp) > 30 * 864e5);
     for (const i of old) { try { await db.doc(`items/${i.id}`).delete(); await db.doc(`answers/${i.id}`).delete(); } catch (x) { break; } }
@@ -1834,6 +1915,7 @@ document.getElementById('bc-form').addEventListener('submit', async (e) => {
   if (!db) { st.textContent = 'The database is not available here.'; return; }
   if (!text) return;
   if (!leads.length) { st.textContent = 'There are no lead agents yet. Add a project with a lead first.'; return; }
+  if (looksLikeProject(text) && e.submitter && e.submitter.id !== 'bc-anyway') { offerNewProject(text, st, 'bc-anyway', 'Send to all leads anyway'); return; }
   const btn = document.getElementById('bc-send');
   btn.disabled = true;
   const bid = `bc_${Date.now().toString(36)}`;
@@ -1844,6 +1926,31 @@ document.getElementById('bc-form').addEventListener('submit', async (e) => {
   btn.disabled = false;
   st.textContent = sent === leads.length ? `Sent to ${sent} lead${sent === 1 ? '' : 's'}: ${leads.map((l) => l.agent).join(', ')}.` : `Sent to ${sent} of ${leads.length} leads. Try again for the rest.`;
   if (sent === leads.length) document.getElementById('bc-text').value = '';
+});
+
+// A message that reads like a new build request is better as its own project.
+function looksLikeProject(text) {
+  const t = text.trim();
+  return t.length > 400 || /^(please\s+)?(build|create|make|develop|design|launch)\b|^(i want|i need|let'?s build|new (app|tool|project|site|website))\b|\bbuild (me )?(a|an)\s/i.test(t);
+}
+function offerNewProject(text, el, anywayId, anywayLabel) {
+  el.hidden = false;
+  el.innerHTML = `This reads like a new project, not an instruction for agents already at work. <button type="button" class="btn primary" data-new-project="1">Start it as a new project</button> <button type="submit" class="btn" id="${anywayId}">${esc(anywayLabel)}</button>`;
+  el.dataset.pending = text;
+}
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-new-project]');
+  if (!b) return;
+  const holder = b.closest('[data-pending]');
+  const text = holder ? holder.dataset.pending : '';
+  document.getElementById('bc-panel').hidden = true;
+  const panel = document.getElementById('add-panel'); panel.hidden = false;
+  document.getElementById('add-result').hidden = true; document.getElementById('add-form').hidden = false;
+  document.getElementById('f-brief').value = text;
+  const m = text.match(/["\u201c]([^"\u201d]{2,40})["\u201d]/);
+  if (m && !document.getElementById('f-name').value) document.getElementById('f-name').value = slug(m[1]);
+  document.getElementById('f-name').focus();
+  panel.scrollIntoView({ block: 'start' });
 });
 
 document.getElementById('f-team').addEventListener('change', (e) => { document.getElementById('f-agents').value = e.target.value; });

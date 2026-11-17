@@ -22,6 +22,9 @@ function useCap(name) {
   return window.claude && window.claude.use ? window.claude.use(name) : Promise.resolve(null);
 }
 const S = { items: [], agents: [], projects: [], tasks: [], unread: [], personas: [] };
+// Delete buttons armed by a first click (key -> time); a second click within 5 seconds deletes.
+const armed = {};
+const isArmed = (key) => armed[key] && Date.now() - armed[key] < 5000;
 const openDetails = new Set(); // details sections the viewer opened, kept open across re-renders
 const pfDrafts = {};            // customer profile form drafts per project
 const drafts = {};

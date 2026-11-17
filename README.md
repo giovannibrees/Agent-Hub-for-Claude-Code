@@ -29,6 +29,9 @@ projects and agents. Approve cards, start agents, set a budget: nothing is saved
 
 ## What's new
 
+**One hub per project.** Every project gets its own hub page, so decisions, agents and progress
+never mix. Type a new build request anywhere and the hub offers to start it as a new project.
+
 **Describe it, approve it, ship it.** Pick what you are building (SaaS, web app, landing page,
 internal tool) and the lead plans from a starter checklist, tells you which accounts to connect,
 and stops at four checkpoints: plan, design, first preview, and delivery. Press **Ship it** and

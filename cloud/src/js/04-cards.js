@@ -103,7 +103,38 @@ function section(id, list, empty, opts) {
   document.getElementById(id).innerHTML = list.length ? list.map((i) => cardHtml(i, opts)).join('') : (empty ? `<p class="empty">${empty}</p>` : '');
 }
 
+// Project tabs: the page shows one project at a time (or all). The choice is remembered per browser.
+let curProject = null;
+function loadProjectChoice() { try { return localStorage.getItem('hub-project'); } catch (e) { return null; } }
+function saveProjectChoice(v) { try { localStorage.setItem('hub-project', v); } catch (e) { /* not kept */ } }
+function pickProject() {
+  const names = S.projects.map((p) => p.name);
+  if (curProject === null) curProject = loadProjectChoice();
+  if (curProject === null || (curProject && !names.includes(curProject))) {
+    const live = S.projects.filter((p) => p.phase !== 'complete' && p.created_at).sort((a, b) => ms(b.created_at) - ms(a.created_at));
+    curProject = names.length > 1 ? ((live[0] || {}).name || '') : '';
+  }
+}
+function renderTabs() {
+  const nav = document.getElementById('ptabs');
+  nav.hidden = S.projects.length < 2;
+  if (nav.hidden) return;
+  const needN = (name) => S.items.filter((i) => i.needs_me && i.status === 'open' && !isSnoozed(i) && (!name || i.project === name)).length;
+  const order = S.projects.slice().sort((a, b) => (a.phase === 'complete') - (b.phase === 'complete') || ms(b.created_at) - ms(a.created_at));
+  const tab = (name, label, extra) => { const n = needN(name); return `<button type="button" class="ptab${curProject === name ? ' on' : ''}${extra || ''}" data-ptab="${esc(name)}" aria-pressed="${curProject === name}">${esc(label)}${n ? ` <span class="badge">${n}</span>` : ''}</button>`; };
+  nav.innerHTML = tab('', 'All projects') + order.map((p) => tab(p.name, p.name, p.phase === 'complete' ? ' done' : '')).join('');
+}
 function render() {
+  pickProject();
+  renderTabs();
+  if (!curProject) return renderView();
+  const keep = { items: S.items, agents: S.agents, projects: S.projects, tasks: S.tasks, unread: S.unread, personas: S.personas };
+  const mine = (x) => (x.project || '') === curProject;
+  S.items = keep.items.filter(mine); S.agents = keep.agents.filter(mine); S.projects = keep.projects.filter((p) => p.name === curProject);
+  S.tasks = keep.tasks.filter(mine); S.unread = keep.unread.filter(mine); S.personas = keep.personas.filter(mine);
+  try { renderView(); } finally { Object.assign(S, keep); }
+}
+function renderView() {
   const a = document.activeElement;
   const focusId = a && a.id && (a.dataset.fbInput || a.dataset.msgInput || a.dataset.pf || a.dataset.budget || a.dataset.search) && a.tagName === 'INPUT' ? a.id : null;
   const caret = focusId ? a.selectionStart : null;
@@ -163,7 +194,7 @@ function render() {
     : 'Builds are complete. Review these ideas and turn the ones you want into a new project.';
   section('ideas', ideas, 'No parked ideas.', { idea: true });
   const closedOld = S.items.filter((i) => ['answered', 'acknowledged', 'archived', 'auto_resolved', 'accepted', 'info'].includes(i.status) && Date.now() - ms(i.timestamp) > 30 * 864e5);
-  document.getElementById('maintenance').innerHTML = closedOld.length ? `${closedOld.length} closed items are older than 30 days. <button class="link" id="prune">Delete them</button>` : '';
+  document.getElementById('maintenance').innerHTML = closedOld.length ? `${closedOld.length} closed items are older than 30 days. <button class="link" id="prune">${isArmed('prune') ? 'Click again to delete them for good' : 'Delete them'}</button>` : '';
 
   if (focusId) { const el = document.getElementById(focusId); if (el) { el.focus(); if (caret != null) el.setSelectionRange(caret, caret); } }
   const live = document.getElementById('refreshed'); live.classList.remove('off'); live.textContent = `Live · ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;

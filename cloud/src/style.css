@@ -83,6 +83,15 @@ button:focus-visible, input:focus, select:focus, textarea:focus, summary:focus-v
 .tile.hot { background: var(--attn-tint); border-color: color-mix(in srgb, var(--attn) 40%, transparent); }
 .tile.hot b, .tile.hot span { color: var(--attn); }
 
+/* Project tabs */
+.ptabs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+.ptab { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 7px 14px; font-weight: 500; display: inline-flex; align-items: center; gap: 8px; }
+.ptab:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.ptab.on { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+.ptab.done { color: var(--muted); }
+.ptab.on.done { color: var(--bg); }
+.ptab .badge { padding: 3px 8px; }
+
 /* Panels (add project, message all leads) */
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; margin-top: 16px; box-shadow: var(--shadow); }
 .panel h2 { margin-bottom: 14px; }

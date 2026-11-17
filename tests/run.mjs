@@ -95,14 +95,14 @@ test('A brief outage is retried once', async () => {
 });
 
 test('Feedback with an attached file; Send waits for the upload', async () => {
-  const p = await open({ faults: { uploadDelay: 800 } });
+  const p = await open({ faults: { uploadDelay: 2500 } });
   const c = card(p, 'Client dashboard');
   await c.locator('[data-fb-open]').click();
   await c.locator('input[data-fb-input]').fill('Darker navy');
   await c.locator('[data-fb-file]').setInputFiles(ATTACH);
-  await p.waitForTimeout(100);
-  check(await c.locator('[data-fb-send]').isDisabled(), 'Send enabled during upload');
-  await p.waitForTimeout(1000);
+  const disabled = await c.locator('[data-fb-send]:disabled').waitFor({ timeout: 1500 }).then(() => true, () => false);
+  check(disabled, 'Send enabled during upload');
+  await c.locator('[data-fb-send]:enabled').waitFor({ timeout: 5000 });
   await c.locator('[data-fb-send]').click();
   await p.waitForTimeout(600);
   const a = await dbGet(p, 'answers/i2');
@@ -253,6 +253,58 @@ test('Agent-written task fields cannot inject markup', async () => {
   await p.evaluate(() => document.querySelectorAll('details[id^=plan-]').forEach((d) => { d.open = true; }));
   check(await p.locator('#pwn1, #pwn2').count() === 0, 'markup from task fields was rendered');
   await p.done();
+});
+
+test('Removing a customer profile needs a second click', async () => {
+  const p = await open();
+  await p.evaluate(() => document.querySelectorAll('.project details').forEach((d) => { d.open = true; }));
+  const btn = p.locator('[data-del-persona]').first();
+  const id = await btn.getAttribute('data-del-persona');
+  await btn.click(); await p.waitForTimeout(300);
+  check(await dbGet(p, `personas/${id}`), 'deleted on the first click');
+  check(/Click again/.test(await btn.textContent()), 'no confirm label');
+  await btn.click(); await p.waitForTimeout(400);
+  check(!(await dbGet(p, `personas/${id}`)), 'not deleted on the second click');
+  await p.done();
+});
+
+test('Project tabs show one project at a time', async () => {
+  const p = await open();
+  await p.click('[data-ptab="client-portal"]'); await p.waitForTimeout(300);
+  const needs = await p.locator('#needs').textContent();
+  check(!/Payments before/.test(needs), 'gym-app card shown under client-portal');
+  check(await p.locator('#agents .agent').count() === (await p.evaluate(async () => (await (await window.HUB_DEMO.use('db')).collection('agents').where('project', '==', 'client-portal').get()).size)), 'agents not filtered');
+  await p.click('[data-ptab=""]'); await p.waitForTimeout(300);
+  check(/Payments before/.test(await p.locator('#needs').textContent()), 'All projects does not show everything');
+  await p.done();
+});
+
+test('A broadcast that reads like a new project offers to start one', async () => {
+  const p = await open();
+  await p.click('#bc-toggle');
+  await p.fill('#bc-text', 'Build "Skill Tailor", a web app that turns a company SOP into a Claude Agent Skill.');
+  await p.click('#bc-send'); await p.waitForTimeout(300);
+  check(!(await p.evaluate(() => window.HUB_CALLS.length && false)), '');
+  const dirs = await p.evaluate(async () => (await (await window.HUB_DEMO.use('db')).collection('directives').get()).size);
+  check(dirs === 0, 'sent before asking');
+  await p.click('[data-new-project]'); await p.waitForTimeout(200);
+  check(!(await p.locator('#add-panel').isHidden()) && /Skill Tailor/.test(await p.inputValue('#f-brief')) && (await p.inputValue('#f-name')) === 'skill-tailor', 'brief not carried to Add project');
+  await p.done();
+});
+
+test('A hub that already has a project hands a new one over as a new-hub request', async () => {
+  const ctx = await browser.newContext({ viewport: { width: 1300, height: 950 } });
+  const p = await ctx.newPage();
+  await p.addInitScript(() => { Object.defineProperty(window, 'HUB_SINGLE_PROJECT', { value: true, writable: false }); });
+  await p.goto(URL_); await p.waitForFunction(() => document.querySelectorAll('#needs article').length > 0);
+  await p.click('#add-toggle');
+  await p.fill('#f-name', 'notes'); await p.fill('#f-brief', 'A notes app.');
+  await p.click('#f-submit'); await p.waitForTimeout(400);
+  const proj = await dbGet(p, 'projects/notes');
+  check(!proj, 'project was added to this hub');
+  const req = await p.locator('#add-result code').textContent();
+  check(/NEW-PROJECT\.md/.test(req) && /Project: notes/.test(req) && /A notes app\./.test(req), `bad request: ${req.slice(0, 120)}`);
+  await ctx.close();
 });
 
 test('Brief helper writes the brief and names what is missing', async () => {

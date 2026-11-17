@@ -1,3 +1,12 @@
+// Deleting needs a second click within 5 seconds; the first click only arms the button.
+function armDelete(btn, label) {
+  const key = btn.dataset.delPersona ? `p:${btn.dataset.delPersona}` : btn.id;
+  if (isArmed(key)) { delete armed[key]; return true; }
+  armed[key] = Date.now(); btn.textContent = label;
+  setTimeout(() => { if (armed[key] && !isArmed(key)) { delete armed[key]; render(); } }, 5100);
+  return false;
+}
+
 document.addEventListener('click', async (e) => {
   const t = e.target.closest('button');
   if (!t) return;
@@ -59,7 +68,9 @@ document.addEventListener('click', async (e) => {
     } catch (x) { pfDrafts[project] = d; render(); projectMsg(project, 'Could not save the profile. Try again.'); }
     return;
   }
-  if (t.dataset.delPersona && db) { try { await db.doc(`personas/${t.dataset.delPersona}`).delete(); } catch (x) { /* stays listed */ } return; }
+  if (t.dataset.delPersona && db) {
+    if (!armDelete(t, 'Click again to remove')) return;
+    try { await db.doc(`personas/${t.dataset.delPersona}`).delete(); } catch (x) { /* stays listed */ } return; }
   if (t.dataset.runTest && db) {
     const project = t.dataset.runTest;
     const who = t.dataset.persona;
@@ -103,9 +114,11 @@ document.addEventListener('click', async (e) => {
     } catch (x) { banner.textContent = 'Your answers cannot be saved. Open this page\'s Permissions menu on claude.ai, allow its database, then reload.'; }
     return;
   }
+  if (t.dataset.ptab !== undefined) { curProject = t.dataset.ptab; saveProjectChoice(curProject); render(); return; }
   if (t.id === 'flt-clear') { filters = { agent: '', project: '', type: '' }; saveFilters(); render(); return; }
   if (t.id === 'add-another') { document.getElementById('add-result').hidden = true; const f = document.getElementById('add-form'); f.reset(); f.hidden = false; return; }
   if (t.id === 'prune' && db) {
+    if (!armDelete(t, 'Click again to delete them for good')) return;
     t.disabled = true;
     const old = S.items.filter((i) => ['answered', 'acknowledged', 'archived', 'auto_resolved', 'accepted', 'info'].includes(i.status) && Date.now() - ms(i.timestamp) > 30 * 864e5);
     for (const i of old) { try { await db.doc(`items/${i.id}`).delete(); await db.doc(`answers/${i.id}`).delete(); } catch (x) { break; } }
@@ -165,6 +178,7 @@ document.getElementById('bc-form').addEventListener('submit', async (e) => {
   if (!db) { st.textContent = 'The database is not available here.'; return; }
   if (!text) return;
   if (!leads.length) { st.textContent = 'There are no lead agents yet. Add a project with a lead first.'; return; }
+  if (looksLikeProject(text) && e.submitter && e.submitter.id !== 'bc-anyway') { offerNewProject(text, st, 'bc-anyway', 'Send to all leads anyway'); return; }
   const btn = document.getElementById('bc-send');
   btn.disabled = true;
   const bid = `bc_${Date.now().toString(36)}`;
@@ -175,6 +189,31 @@ document.getElementById('bc-form').addEventListener('submit', async (e) => {
   btn.disabled = false;
   st.textContent = sent === leads.length ? `Sent to ${sent} lead${sent === 1 ? '' : 's'}: ${leads.map((l) => l.agent).join(', ')}.` : `Sent to ${sent} of ${leads.length} leads. Try again for the rest.`;
   if (sent === leads.length) document.getElementById('bc-text').value = '';
+});
+
+// A message that reads like a new build request is better as its own project.
+function looksLikeProject(text) {
+  const t = text.trim();
+  return t.length > 400 || /^(please\s+)?(build|create|make|develop|design|launch)\b|^(i want|i need|let'?s build|new (app|tool|project|site|website))\b|\bbuild (me )?(a|an)\s/i.test(t);
+}
+function offerNewProject(text, el, anywayId, anywayLabel) {
+  el.hidden = false;
+  el.innerHTML = `This reads like a new project, not an instruction for agents already at work. <button type="button" class="btn primary" data-new-project="1">Start it as a new project</button> <button type="submit" class="btn" id="${anywayId}">${esc(anywayLabel)}</button>`;
+  el.dataset.pending = text;
+}
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-new-project]');
+  if (!b) return;
+  const holder = b.closest('[data-pending]');
+  const text = holder ? holder.dataset.pending : '';
+  document.getElementById('bc-panel').hidden = true;
+  const panel = document.getElementById('add-panel'); panel.hidden = false;
+  document.getElementById('add-result').hidden = true; document.getElementById('add-form').hidden = false;
+  document.getElementById('f-brief').value = text;
+  const m = text.match(/["\u201c]([^"\u201d]{2,40})["\u201d]/);
+  if (m && !document.getElementById('f-name').value) document.getElementById('f-name').value = slug(m[1]);
+  document.getElementById('f-name').focus();
+  panel.scrollIntoView({ block: 'start' });
 });
 
 document.getElementById('f-team').addEventListener('change', (e) => { document.getElementById('f-agents').value = e.target.value; });

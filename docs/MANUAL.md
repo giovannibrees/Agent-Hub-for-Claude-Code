@@ -25,6 +25,11 @@ every part of it.
 
 ## What's new
 
+- **One hub per project:** each project gets its own hub page, so cards never mix. **Add project**
+  in a hub that already has a project gives you a request to paste into Claude Code, which
+  creates the new hub (see `docs/NEW-PROJECT.md`). Messages that read like a new build request
+  offer to start a new project instead. Hubs with older shared projects get project tabs.
+- **Deletes ask twice:** "Delete them" and "Remove" on profiles need a second click.
 - **Build a new app from one form:** pick what you are building (SaaS, web app, landing page,
   internal tool) and the lead starts from a starter checklist, lists the accounts it needs, and
   stops at four checkpoints for you. See [Build a new app](#build-a-new-app).

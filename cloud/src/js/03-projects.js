@@ -9,7 +9,7 @@ function profilesHtml(p) {
   return `<details id="pers-${esc(p.name)}" data-keep${openDetails.has(`pers-${p.name}`) ? ' open' : ''}><summary>Customer profiles (${list.length})</summary>
     <div class="cards">
       ${list.length ? `<ul class="plist">${list.map((x) => `<li><span>${esc(x.name)}, ${esc(x.age)}, IT ${esc(x.it_skill)}, ${esc(x.device)}${x.needs ? ` · ${esc(x.needs)}` : ''}</span>
-        <span><button type="button" class="link" data-run-test="${esc(p.name)}" data-persona="${esc(x.name)}">Run user test</button> · <button type="button" class="link" data-del-persona="${esc(x.id)}">Remove</button></span></li>`).join('')}</ul>
+        <span><button type="button" class="link" data-run-test="${esc(p.name)}" data-persona="${esc(x.name)}">Run user test</button> · <button type="button" class="link" data-del-persona="${esc(x.id)}">${isArmed(`p:${x.id}`) ? 'Click again to remove' : 'Remove'}</button></span></li>`).join('')}</ul>
         <div><button type="button" class="btn" data-run-test="${esc(p.name)}" data-persona="">Test with all profiles</button></div>` : '<p class="hint">Add the kinds of customers who will use this app. A usertest agent then uses the app as each of them and reports bugs and confusing spots.</p>'}
       <div class="pf">
         <input type="text" id="${esc(id('name'))}" data-pf="${esc(p.name)}" data-field="name" placeholder="Name, e.g. Maria" value="${esc(d.name || '')}" maxlength="40">

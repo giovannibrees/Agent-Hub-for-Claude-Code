@@ -147,9 +147,18 @@ async function checkPerms() {
   try { if ((await perms.state('db')) === 'denied') showPermBanner(); } catch (e) { /* state never rejects */ }
 }
 
+function newHubRequest(p) {
+  return [`Create a new Agent Hub for a new project, following docs/NEW-PROJECT.md in github.com/giovannibrees/Agent-Hub-for-Claude-Code.`,
+    `Copy the hub rules (config: protocol, roles, alerts, alert-relay) and the lessons from ${HUB_URL}.`,
+    `Project: ${p.name}`, `Team: ${p.agents}`, `Type: ${p.kind}`, `Live URL: ${p.live || 'none yet'}`, `Repo: ${p.repo || 'none yet'}`, `Priority: ${p.priority}`,
+    `Brief:`, p.brief].join('\n');
+}
+const msgOffer = {}; // agent -> message text that read like a new project
 async function sendMessage(agent, btn) {
   const text = clean(msgDrafts[agent] || '').trim();
   if (!text || !db) return;
+  if (looksLikeProject(text) && msgOffer[agent] !== text) { msgOffer[agent] = text; render(); return; }
+  delete msgOffer[agent];
   btn.disabled = true;
   try {
     const ag = S.agents.find((a) => a.agent === agent) || {};
@@ -185,6 +194,20 @@ document.getElementById('add-form').addEventListener('submit', async (e) => {
   if (!name || !brief || !agents.length) { err.textContent = 'Give the project a name, at least one agent and a brief.'; err.hidden = false; return; }
   if (S.projects.some((p) => p.name === name)) { err.textContent = `A project called ${name} already exists. Pick another name.`; err.hidden = false; return; }
   const role = roleOf;
+  // One project per hub: a hub that already has a project hands the new one to Claude, which
+  // publishes a fresh hub page for it (docs/NEW-PROJECT.md).
+  const single = window.HUB_SINGLE_PROJECT !== undefined ? window.HUB_SINGLE_PROJECT : !window.HUB_DEMO;
+  if (single && S.projects.length) {
+    const req = newHubRequest({ name, agents: document.getElementById('f-agents').value, kind: document.getElementById('f-kind').value,
+      live: document.getElementById('f-live').value.trim(), repo, priority: document.getElementById('f-priority').value, brief });
+    const out = document.getElementById('add-result');
+    out.innerHTML = `<h3>${esc(name)} gets its own hub</h3>
+      <p class="note">Each project has its own hub page, so its cards never mix with other projects. Paste this request into Claude Code (any session): it creates the hub, copies your rules and lessons, and starts the agents. You get the new link back.</p>
+      <div class="cmd"><code>${esc(req)}</code><button type="button" class="btn primary" data-copy="${esc(req)}">Copy request</button></div>
+      <button type="button" class="link" id="add-another">Back to the form</button>`;
+    out.hidden = false; document.getElementById('add-form').hidden = true;
+    return;
+  }
   const btn = document.getElementById('f-submit');
   btn.disabled = true;
   try {
