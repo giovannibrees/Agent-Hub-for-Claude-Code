@@ -142,7 +142,8 @@ and read `level` (missing doc or field: `important`):
 To alert, `get` collection `config`, doc_id `alert-relay` and read `trigger_id`. Call the
 `fire_trigger` tool of the Claude Code Remote connector (load it with ToolSearch
 `select:mcp__claude-code-remote__fire_trigger`) once, with that `trigger_id` and `text` set to
-`<project>: <title>. <one short line on what you need>` (under 200 characters). The CEO then gets
+`<project>: <title>. <one short line on what you need>. Open: <HUB>` (under 300 characters;
+the link is this project's hub, so the alert opens the right page). The CEO then gets
 a push and an email. One alert per item, never for status, idea or delivery items. If there is no
 `alert-relay` doc, or the tool is missing or fails, carry on: the card is in the hub either way.
 
