@@ -1,10 +1,12 @@
 // ---------- rendering ----------
 
-// Running: seen in the last 30 minutes, or asleep on purpose until a check that is not overdue yet.
+// Running: seen in the last 30 minutes, resting until it is woken (its session is alive and the
+// hub wakes it when there is work), or asleep on purpose until a check that is not overdue yet.
 // Delivered and stopped agents are not running.
 function isRunning(a) {
   if (a.state === 'stopped') return false;
   if (Date.now() - ms(a.last_seen) < STALE_MIN * 60000) return true;
+  if (a.state === 'resting' && a.session_id) return true;
   return a.state !== 'delivered' && !!a.next_check_at && ms(a.next_check_at) + 10 * 60000 > Date.now();
 }
 
@@ -208,6 +210,7 @@ function agentState(a, waitingOnYou) {
   if (!a.last_seen && !a.started_at) return { key: 'idle', label: 'Not started' };
   if (Date.now() - ms(a.last_seen) < STALE_MIN * 60000) return { key: 'working', label: 'Working' };
   if (a.next_check_at && ms(a.next_check_at) > Date.now()) return { key: 'resting', label: `Resting until ${hhmm(a.next_check_at)}` };
+  if (a.state === 'resting') return { key: 'resting', label: 'Resting until there is work' };
   return { key: 'idle', label: 'Idle' };
 }
 

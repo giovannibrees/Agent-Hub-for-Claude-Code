@@ -49,7 +49,7 @@ Each check is one iteration. Do not rely on `/loop`: it is not available in ever
 0. Budget: `get` your project; if `budget_paused` is true, set your agents doc `state: "stopped"`
    and end the loop without scheduling a next check. The lead wakes you when the CEO raises the
    budget. The lead never stops for the budget: it does only step 2 and 3 (answers, directives),
-   then schedules its next check in 4 hours. Raising the budget on the page wakes it at once.
+   then rests (step 5). Raising the budget on the page wakes it at once.
 1. Heartbeat: `update` collection `agents`, doc_id = your name, data
    `{"last_seen": "<now ISO>", "state": "working", "current_task": "<id or empty>",
    "doing": "<what you are doing right now, plain words, max 80 characters>"}`. The CEO's progress
@@ -61,21 +61,20 @@ Each check is one iteration. Do not rely on `/loop`: it is not available in ever
 3. Directives: `query` collection `directives` with where `[["to","==","<you>"],["read","==",false]]`.
    Act on each, then mark `{"read": true}`.
 4. Work on your current task. Post items as needed.
-5. Pace the loop to keep cost low. Every check costs the CEO usage, so rest when nothing can move:
-   - Working on a task: check as often as the work needs; about 30 minutes for the lead's audits.
-   - Waiting on the CEO (a plan, design, preview, release, scope change or to-do card): about
-     every 10 minutes for the first 30 minutes after you posted it, then every 60 minutes. The
-     CEO's answer wakes you at once, so a longer rest does not delay the work.
-   - Blocked on another agent, or only waiting for answers: about 60 minutes.
-   - Lead after the project delivery: every 4 hours until the CEO decides.
-   - Nothing left that you can do and nothing open: end the loop. Delivered: end the loop.
-6. Schedule your next check so it survives: an idle session can be shut down, and a wait inside
-   the session is then lost. At the end of every iteration, call the `send_later` tool of the
-   Claude Code Remote connector (ToolSearch `select:mcp__claude-code-remote__send_later`) with
-   `delay_minutes` set to your pace and the message "Agent Hub check: run your next loop
-   iteration." Write the time into your agents doc as `next_check_at` (in the same heartbeat
-   update or a second one). The hub shows an agent whose `next_check_at` passed more than 10
-   minutes ago as asleep.
+5. Rest instead of polling. Every check costs the CEO usage, and a check that finds nothing new
+   is waste. You are woken when there is work: the hub page wakes the agent an answer or
+   directive is for, and agents wake the agent they hand work to (below).
+   - Working on a task: keep working in this turn until it is done or you hand it on.
+   - Waiting on the CEO, on another agent, or with nothing left to do (the lead after the
+     project delivery too): do not schedule a check. `update` your agents doc with
+     `{"state": "resting", "next_check_at": {"__delete__": true}, "doing": "<what you wait for>"}`
+     and end the turn.
+6. Schedule a check only when you wait on something outside the hub that cannot wake you: a CI
+   run, a deploy, a long import. Then call `send_later` once (Claude Code Remote connector,
+   ToolSearch `select:mcp__claude-code-remote__send_later`) with `delay_minutes` set to when it
+   should be done and the message "Agent Hub check: run your next loop iteration.", and write
+   that time into your agents doc as `next_check_at`. Never chain checks while you only wait.
+   Never schedule a check for the four-hour rule: you apply it the next time you are awake.
 
 ### Wake the agent you hand work to
 
@@ -88,8 +87,9 @@ at once instead of waiting for its next check: read its agents doc and, if it ha
 "Wake <agent>", and the prompt "Agent Hub: you have new work. Run your next loop iteration now."
 An agent without a `session_id` picks the work up on its own next check. Never use
 `fire_trigger` to wake an agent: firing a task starts a new, empty session instead of waking the
-agent's own. Do not create standing "wake" tasks. The hub's watchdog also wakes any agent that is
-more than 15 minutes past its `next_check_at`.
+agent's own. Do not create standing "wake" tasks. The hub's watchdog, a few times a day, wakes
+an agent that has unread answers or directives older than 30 minutes, or that is past a
+`next_check_at` it set (a missed wake).
 
 ## 3. Posting items
 
@@ -255,7 +255,8 @@ Four-hour rule: if your question is still `open` 4 hours after `timestamp`, `rev
 true and there is no `change`: `set` `answers/<id>` with `{"item_id": id, "agent": you,
 "decision": "auto", "text": "Proceeded with recommendation", "read": true, "answered_at": now}`,
 `update` the item with `{"status": "auto_resolved", "needs_me": false, "answer": {"decision": "auto", "at": now}}`,
-and post a status item saying you proceeded and with what.
+and post a status item saying you proceeded and with what. Apply this rule when you are awake
+anyway; never stay awake or schedule a check only to wait for the four hours.
 
 ## 6. Screenshots and files
 
